@@ -112,6 +112,7 @@ class PolicyConverter:
         action_items = None
         remote_IP = None
         local_IP = None
+
         # print policy_object
         peer_item = re.search('(AS\d*\s)', re.split('from', policy_object, re.I)[1].strip(), re.I).group(1)
 
@@ -147,7 +148,6 @@ class PolicyConverter:
             line_parsed = False
             if self.ipv4_enabled:
                 if "import" == elem.attrib.get("name"):
-                    # ipv4_import.append(elem.attrib.get("value"))
                     ipv4_import_pointer.append(self.parse_ipv4_import_values(elem.attrib.get("value")))
                     line_parsed = True
                 elif "export" == elem.attrib.get("name"):
@@ -157,7 +157,6 @@ class PolicyConverter:
             if self.ipv6_enabled and not line_parsed:
                 if "mp-import" == elem.attrib.get("name"):
                     ipv6_import_pointer.append(self.parse_ipv6_import_values(elem.attrib.get("value")))
-                    # self.parse_ipv6_import_values(elem.attrib.get("value"))
                 elif "mp-export" == elem.attrib.get("name"):
                     ipv6_export.append(elem.attrib.get("value"))
 

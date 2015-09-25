@@ -57,6 +57,8 @@ def get_policy_template(autnum):
 
     # Then place the AS-Sets
     et.SubElement(template_root, 'as-sets')
+    # Then place the AS-Sets
+    et.SubElement(template_root, 'rs-sets')
 
     #That comes later
     policy_root = et.SubElement(template_root, 'policy')
