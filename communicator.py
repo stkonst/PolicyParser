@@ -24,7 +24,7 @@ def search_url_builder(query_string, inverse_attribute, type_filter1, type_filte
     if flags is not None:
         new_url += "&flags=%s" % flags
 
-    return (ripe_db_url + new_url)
+    return ripe_db_url + new_url
 
 
 def send_db_request(dburl):

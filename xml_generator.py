@@ -30,6 +30,18 @@ def get_import_template(asn, local_ip, remote_ip):
     return new_import
 
 
+def get_export_template(asn, local_ip, remote_ip):
+    new_export = et.Element('announce')
+    new_export.set('to', asn)
+
+    if local_ip is not None:
+        new_export.set('local-ip', local_ip)
+    if remote_ip is not None:
+        new_export.set('remote-ip', remote_ip)
+
+    return new_export
+
+
 def create_new_prefix(version, prefix, origin):
     new_prefix = et.Element("prefix")
     new_prefix.set("version", version)
@@ -47,7 +59,7 @@ def get_route_object_template(autnum):
     return route_template
 
 
-def get_policy_template(autnum):
+def get_policy_template(autnum, ipv4, ipv6):
     template_root = et.Element('root')
     template_root.append(et.Comment('This is a resolved XML policy file for ' + autnum))
 
@@ -57,15 +69,20 @@ def get_policy_template(autnum):
 
     # Then place the AS-Sets
     et.SubElement(template_root, 'as-sets')
-    # Then place the AS-Sets
+    # Then place the RS-Sets
     et.SubElement(template_root, 'rs-sets')
 
-    #That comes later
+    # That comes later
     policy_root = et.SubElement(template_root, 'policy')
-    et.SubElement(policy_root, 'imports')
-    et.SubElement(policy_root, 'v6imports')
-    et.SubElement(policy_root, 'exports')
-    et.SubElement(policy_root, 'v6exports')
+
+    if ipv4:
+        et.SubElement(policy_root, 'imports')
+        et.SubElement(policy_root, 'exports')
+
+    if ipv6:
+        et.SubElement(policy_root, 'v6imports')
+        et.SubElement(policy_root, 'v6exports')
+
     et.SubElement(policy_root, 'default')
 
     return template_root

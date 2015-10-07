@@ -16,9 +16,7 @@ class PolicyConverter:
 
     def init_xml_template(self):
         """ Initialise the xml template where it will be used to fill with policy values """
-        self.xml_policy = xmlgen.get_policy_template(self.autnum)
-        # new_template[3][0].append(xmlgen.get_import_template(self.autnum, "", ""))
-        # Alternative can be: imports_element = new_template.find('policy').find('imports')
+        self.xml_policy = xmlgen.get_policy_template(self.autnum, self.ipv4_enabled, self.ipv6_enabled)
 
     def extract_routes_from_search(self, db_object):
 
@@ -50,11 +48,12 @@ class PolicyConverter:
                     xml_routes[0].append(new_entry)
         return xml_routes
 
-    def extract_import_v4_ips(self, policy_object):
+    def extract_v4_ips_from_item(self, policy_object):
+
         local_IP = None
         remote_IP = None
 
-        items = re.split('\sat\s', policy_object, re.I)
+        items = re.split('\sat|AT\s', policy_object, re.I)
         subset_before = items[0].split()
         subset_after = items[1].split()
 
@@ -66,11 +65,12 @@ class PolicyConverter:
 
         return local_IP, remote_IP
 
-    def extract_import_v6_ips(self, policy_object):
+    def extract_v6_ips_from_item(self, policy_object):
+
         local_IP = None
         remote_IP = None
 
-        items = re.split('\sat\s', policy_object, re.I)
+        items = re.split('\sat|AT\s', policy_object, re.I)
         subset_before = items[0].split()
         subset_after = items[1].split()
 
@@ -82,20 +82,22 @@ class PolicyConverter:
 
         return local_IP, remote_IP
 
-    def parse_ipv4_import_values(self, policy_object):
+    def parse_ipv4_import_values(self, policy_object, unknown_as, unknown_filters):
 
         action_items = None
         remote_IP = None
         local_IP = None
 
-        peer_item = re.split('\s', policy_object)[1].strip()
+        peer_as = re.split('\s', policy_object)[1].strip()
+        unknown_as.add(peer_as)
 
         # First step: retrieve the filter items (Mandatory and multiple)
-        filter_items = re.split('\.*accept\.*', policy_object, re.I)[1].split()
+        filter_items = re.split('\.*accept|ACCEPT\.*', policy_object, re.I)[1].split()
+        unknown_filters.update(set(filter_items))
 
         # Second step: Check if there are any IPs of routers inside (Optional)
         if re.search('\sat\s', policy_object, re.I):
-            local_IP, remote_IP = self.extract_import_v4_ips(policy_object)
+            local_IP, remote_IP = self.extract_v4_ips_from_item(policy_object)
 
         # Before third step check if optional action(s) exist
         if "action" in policy_object:
@@ -103,25 +105,54 @@ class PolicyConverter:
             actions = re.search(r'action(.*)accept', policy_object, re.I).group(1)
             action_items = actions.split(";")
 
-        new_import = xmlgen.get_import_template(peer_item, local_IP, remote_IP)
+        new_import = xmlgen.get_import_template(peer_as, local_IP, remote_IP)
         new_import.append(xmlgen.get_action_filter_template(action_items, filter_items))
         return new_import
 
-    def parse_ipv6_import_values(self, policy_object):
+    def parse_ipv4_export_values(self, policy_object, unknown_as, unknown_filters):
 
         action_items = None
         remote_IP = None
         local_IP = None
 
-        # print policy_object
-        peer_item = re.search('(AS\d*\s)', re.split('from', policy_object, re.I)[1].strip(), re.I).group(1)
+        peer_as = re.split('\s', policy_object)[1].strip()
+        unknown_as.add(peer_as)
 
-        # First step: retrieve the filter items (Mandatory and multiple)
-        filter_items = re.split('\.*accept\.*', policy_object, re.I)[1].split()
+        # First get the announce (filter) items
+        filter_items = re.split('\.*announce|ANNOUNCE\.*', policy_object, re.I)[1].split()
+        unknown_filters.update(set(filter_items))
 
         # Second step: Check if there are any IPs of routers inside (Optional)
         if re.search('\sat\s', policy_object, re.I):
-            local_IP, remote_IP = self.extract_import_v6_ips(policy_object)
+            local_IP, remote_IP = self.extract_v4_ips_from_item(policy_object)
+
+        # Then let's receive the actions that need to be applied
+        if "action" in policy_object:
+            # Forth step: extract the actions separately (Optional and multiple)
+            actions = re.search(r'action(.*)announce', policy_object, re.I).group(1)
+            action_items = actions.split(";")
+
+        new_export = xmlgen.get_export_template(peer_as, local_IP, remote_IP)
+        new_export.append(xmlgen.get_action_filter_template(action_items, filter_items))
+        return new_export
+
+    def parse_ipv6_import_values(self, policy_object, unknown_as, unknown_filters):
+
+        action_items = None
+        remote_IP = None
+        local_IP = None
+
+        # Get the peer AS first
+        peer_as = re.search('(AS\d*\s)', re.split('from|FROM', policy_object, re.I)[1].strip(), re.I).group(1)
+        unknown_as.add(peer_as)
+
+        # First step: retrieve the filter items (Mandatory and multiple)
+        filter_items = re.split('\.*accept|ACCEPT\.*', policy_object, re.I)[1].split()
+        unknown_filters.update(set(filter_items))
+
+        # Second step: Check if there are any IPs of routers inside (Optional)
+        if re.search('\sat\s', policy_object, re.I):
+            local_IP, remote_IP = self.extract_v6_ips_from_item(policy_object)
 
         # Before third step check if optional action(s) exist
         if "action" in policy_object:
@@ -129,41 +160,82 @@ class PolicyConverter:
             actions = re.search(r'action(.*)accept', policy_object, re.I).group(1)
             action_items = actions.split(";")
 
-        new_import = xmlgen.get_import_template(peer_item, local_IP, remote_IP)
+        new_import = xmlgen.get_import_template(peer_as, local_IP, remote_IP)
         new_import.append(xmlgen.get_action_filter_template(action_items, filter_items))
         return new_import
+
+    def parse_ipv6_export_values(self, policy_object, unknown_as, unknown_filters):
+        action_items = None
+        remote_IP = None
+        local_IP = None
+
+        peer_as = re.search('(AS\d*\s)', re.split('to|TO', policy_object, re.I)[1].strip(), re.I).group(1)
+        unknown_as.add(peer_as)
+
+        # First get the announce (filter) items
+        filter_items = re.split('\.*announce|ANNOUNCE\.*', policy_object, re.I)[1].split()
+        unknown_filters.update(set(filter_items))
+
+        # Second step: Check if there are any IPs of routers inside (Optional)
+        if re.search('\sat\s', policy_object, re.I):
+            local_IP, remote_IP = self.extract_v6_ips_from_item(policy_object)
+
+        # Then let's receive the actions that need to be applied
+        if "action" in policy_object:
+            # Forth step: extract the actions separately (Optional and multiple)
+            actions = re.search(r'action(.*)announce', policy_object, re.I).group(1)
+            action_items = actions.split(";")
+
+        new_export = xmlgen.get_export_template(peer_as, local_IP, remote_IP)
+        new_export.append(xmlgen.get_action_filter_template(action_items, filter_items))
+        return new_export
 
     def extract_rpsl_policy_(self, db_object):
 
+        unknown_as = set()
+        unknown_filters = set()
+
         if self.ipv4_enabled:
             ipv4_import_pointer = self.xml_policy.find('policy/imports')
-            ipv4_export = list()
+            ipv4_export_pointer = self.xml_policy.find('policy/exports')
 
         if self.ipv6_enabled:
             ipv6_import_pointer = self.xml_policy.find('policy/v6imports')
-            ipv6_export = list()
+            ipv6_export_pointer = self.xml_policy.find('policy/v6exports')
 
         for elem in db_object.iterfind('./objects/object[@type="aut-num"]/attributes/attribute'):
 
             line_parsed = False
             if self.ipv4_enabled:
                 if "import" == elem.attrib.get("name"):
-                    ipv4_import_pointer.append(self.parse_ipv4_import_values(elem.attrib.get("value")))
+                    ipv4_import_pointer.append(
+                        self.parse_ipv4_import_values(elem.attrib.get("value"), unknown_as, unknown_filters))
                     line_parsed = True
                 elif "export" == elem.attrib.get("name"):
-                    ipv4_export.append(elem.attrib.get("value"))
+                    ipv4_export_pointer.append(
+                        self.parse_ipv4_export_values(elem.attrib.get("value"), unknown_as, unknown_filters))
                     line_parsed = True
 
-            if self.ipv6_enabled and not line_parsed:
+            if not line_parsed and self.ipv6_enabled:
                 if "mp-import" == elem.attrib.get("name"):
-                    ipv6_import_pointer.append(self.parse_ipv6_import_values(elem.attrib.get("value")))
+                    ipv6_import_pointer.append(
+                        self.parse_ipv6_import_values(elem.attrib.get("value"), unknown_as, unknown_filters))
                 elif "mp-export" == elem.attrib.get("name"):
-                    ipv6_export.append(elem.attrib.get("value"))
+                    ipv6_export_pointer.append(
+                        self.parse_ipv6_export_values(elem.attrib.get("value"), unknown_as, unknown_filters))
 
-                    # return , ipv4_export, ipv6_import, ipv6_export
+        return unknown_as, unknown_filters
 
     def get_routes_from_object(self, autnum):
-        db_object = et.fromstring(fetcher.send_db_request(
-            fetcher.search_url_builder(autnum, "origin", "route", "route6")))
+
+        db_reply = fetcher.send_db_request(fetcher.search_url_builder(autnum, "origin", "route", "route6"))
+        if "No Objects found" in db_reply or "Illegal input" in db_reply:
+            xml_answer = xmlgen.get_route_object_template(autnum)
+            xml_answer.set("ERROR", db_reply)
+            return xml_answer
+
+        db_object = et.fromstring(db_reply)
+        if db_object.find('errormessages/errormessage[@severity="Error"]'):
+            return xmlgen.get_route_object_template(autnum)
 
         return self.extract_routes_from_search(db_object)

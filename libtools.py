@@ -15,14 +15,13 @@ def check_autnum_validity(autnum):
     if len(autnum) < 3:
         print "AS number is too small"
     else:
-        as_pattern = re.compile('AS\d+')
+        as_pattern = re.compile('AS\d+$')
         if as_pattern.match(autnum):
             return True
         return False
 
 
 def is_valid_ipv4(item):
-
     if ipv4_address.match(item):
         return True
     return False
