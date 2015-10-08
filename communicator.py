@@ -8,6 +8,7 @@ default_db_source = "ripe"
 def locator_url_builder(db_type, db_key, db_source=default_db_source):
     """http://rest.db.ripe.net/ripe/aut-num/AS199664"""
     new_url = "/%s/%s/%s" % (db_source, db_type, db_key)
+    # new_url = "search.xml?query-string=%s" % db_key
     return ripe_db_url + new_url
 
 

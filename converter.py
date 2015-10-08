@@ -190,11 +190,16 @@ class PolicyConverter:
         new_export.append(xmlgen.get_action_filter_template(action_items, filter_items))
         return new_export
 
-    def extract_rpsl_policy_(self, db_object):
+    def extract_rpsl_policy(self, autnum):
 
         unknown_as = set()
         unknown_filters = set()
 
+        db_reply = self.get_policy_by_autnum(autnum)
+        if db_reply is None:
+            return unknown_as, unknown_filters
+
+        db_object = et.fromstring(db_reply)
         if self.ipv4_enabled:
             ipv4_import_pointer = self.xml_policy.find('policy/imports')
             ipv4_export_pointer = self.xml_policy.find('policy/exports')
@@ -207,19 +212,23 @@ class PolicyConverter:
 
             line_parsed = False
             if self.ipv4_enabled:
+
                 if "import" == elem.attrib.get("name"):
                     ipv4_import_pointer.append(
                         self.parse_ipv4_import_values(elem.attrib.get("value"), unknown_as, unknown_filters))
                     line_parsed = True
+
                 elif "export" == elem.attrib.get("name"):
                     ipv4_export_pointer.append(
                         self.parse_ipv4_export_values(elem.attrib.get("value"), unknown_as, unknown_filters))
                     line_parsed = True
 
             if not line_parsed and self.ipv6_enabled:
+
                 if "mp-import" == elem.attrib.get("name"):
                     ipv6_import_pointer.append(
                         self.parse_ipv6_import_values(elem.attrib.get("value"), unknown_as, unknown_filters))
+
                 elif "mp-export" == elem.attrib.get("name"):
                     ipv6_export_pointer.append(
                         self.parse_ipv6_export_values(elem.attrib.get("value"), unknown_as, unknown_filters))
@@ -230,12 +239,19 @@ class PolicyConverter:
 
         db_reply = fetcher.send_db_request(fetcher.search_url_builder(autnum, "origin", "route", "route6"))
         if "No Objects found" in db_reply or "Illegal input" in db_reply:
-            xml_answer = xmlgen.get_route_object_template(autnum)
-            xml_answer.set("ERROR", db_reply)
-            return xml_answer
+            xml_error_answer = xmlgen.get_route_object_template(autnum)
+            xml_error_answer.set("ERROR", db_reply)
+            return xml_error_answer
 
-        db_object = et.fromstring(db_reply)
+        db_object = et.fromstring(db_reply.encode('utf-8').strip())
         if db_object.find('errormessages/errormessage[@severity="Error"]'):
             return xmlgen.get_route_object_template(autnum)
 
         return self.extract_routes_from_search(db_object)
+
+    def get_policy_by_autnum(self, autnum):
+
+        db_reply = fetcher.send_db_request(fetcher.locator_url_builder("aut-num", autnum))
+        if "No Objects found" in db_reply or "Illegal input" in db_reply:
+            return None
+        return db_reply
