@@ -20,7 +20,7 @@ def get_action_filter_template(action_items, filter_items):
 
 def get_import_template(asn, local_ip, remote_ip):
     new_import = et.Element('accept')
-    new_import.set('from', asn)
+    new_import.set('from', asn.upper())
 
     if local_ip is not None:
         new_import.set('local-ip', local_ip)
@@ -47,16 +47,42 @@ def create_new_prefix(version, prefix, origin):
     new_prefix.set("version", version)
 
     if origin is not None:
-        new_prefix.set("origin", origin)
+        new_prefix.set("origin", origin.upper())
     new_prefix.text = prefix
     return new_prefix
 
 
-def get_route_object_template(autnum):
-    route_template = et.Element(autnum)
-    et.SubElement(route_template, "prefixes")
+def create_new_member(ref_type, value, version):
+    new_member = et.Element("member")
+    if ref_type is not None:
+        new_member.set("referenced-type", ref_type)
 
-    return route_template
+    if version is not None:
+        new_member.set("ip-version", version)
+
+    new_member.text = value
+    return new_member
+
+
+def get_route_object_template(autnum):
+    template_root = et.Element(autnum.upper())
+    et.SubElement(template_root, "prefixes")
+
+    return template_root
+
+
+def get_as_set_template(as_set):
+    template_root = et.Element("filter")
+    template_root.set("name", as_set.upper())
+    et.SubElement(template_root, "members")
+    return template_root
+
+
+def get_rs_set_template(rs_set):
+    template_root = et.Element("filter")
+    template_root.set("name", rs_set.upper())
+    et.SubElement(template_root, "members")
+    return template_root
 
 
 def get_policy_template(autnum, ipv4, ipv6):
@@ -65,10 +91,10 @@ def get_policy_template(autnum, ipv4, ipv6):
 
     # First place the route/route6 objects per AS
     et.SubElement(template_root, 'route-objects')
-    # route_root.append(get_route_object_template(autnum))
 
     # Then place the AS-Sets
     et.SubElement(template_root, 'as-sets')
+
     # Then place the RS-Sets
     et.SubElement(template_root, 'rs-sets')
 
