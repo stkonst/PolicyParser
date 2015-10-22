@@ -20,7 +20,7 @@ rs_set_pattern = re.compile('RS-(\w|-)*', re.I)
 rtr_set_pattern = re.compile('RTR-(\w|-)*', re.I)
 filter_set_pattern = re.compile('FLTR-(\w|-)*', re.I)
 
-asname_patter = re.compile('AS-(\w)*(\w)', re.I)
+asname_pattern = re.compile('AS-(\w)*(\w)', re.I)
 
 
 def check_autnum_validity(autnum):

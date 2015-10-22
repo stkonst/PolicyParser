@@ -1,6 +1,7 @@
 __author__ = 'stavros'
 import sys
 import xml.etree.ElementTree as ET
+from xml.dom.minidom import parseString
 
 import converter as PC
 import libtools as tools
@@ -9,29 +10,34 @@ help_message = "Please run again by typing parser -a <ASXXX>"
 params = dict()
 
 
+def collect_filters_from_peers(allpeers):
+    filter_set = set()
+    for val in allpeers.itervalues():
+        filter_set.update(val.get_all_filters())
+
+    print "Found %s filters to resolve." % len(filter_set)
+    return filter_set
+
+
 def build_xml_policy(autnum, ipv4=True, ipv6=True):
-    # Init converter object
+
     policy_converter = PC.PolicyConverter(autnum, ipv4, ipv6)
 
     # Init new xml template
     policy_converter.init_xml_template()
 
     print "Resolving own policy (%s)" % autnum
-    # Get the routes of the given Autonomous system
-    policy_converter.xml_policy.find('./route-objects').append(
-        policy_converter.get_routes_from_object(policy_converter.autnum))
+    allpeers = policy_converter.extract_rpsl_policy(autnum)
 
-    # Extract the values from the policy RPSL object
-    policy_filters = policy_converter.extract_rpsl_policy(autnum)
+    print "Convert peers to XML"
+    policy_converter.convert_peers_toxml(allpeers)
 
-    totalf = len(policy_filters)
+    policy_filters = collect_filters_from_peers(allpeers)
     counter = 0
-    print "Need to resolve %s filters " % totalf
-
     for pfilter in policy_filters:
         # Get the routes/prefixes of the given filter
-        counter = counter + 1
-        print "%s/%s " % (counter, totalf),
+        counter += 1
+        print "%s : " % (counter),
         if pfilter == "ANY" or pfilter == "any":
             print "\tSkipping any"
         else:
@@ -44,6 +50,7 @@ def build_xml_policy(autnum, ipv4=True, ipv6=True):
                 print "\tFailed to resolve %s, Error: %s" % (pfilter, e)
                 pass
 
+    # print allpeers.keys()
     return policy_converter.xml_policy
 
 
@@ -71,16 +78,14 @@ else:
 
 print "Configuration done. Initialising..."
 
-# rough_string = ET.tostring()
-# reparsed = parseString(rough_string)
 xml_result = build_xml_policy(params.get("as_number"))
 
-if params["output_file"]:
+if params.has_key("output_file"):
     f = open(params["output_file"], mode='w')
-    # f.write(reparsed.toprettyxml(indent="\t"))
     f.write(ET.tostring(xml_result, encoding='utf-8'))
     f.close()
 else:
-    # print reparsed.toprettyxml(indent="\t")
-    print ET.dump(xml_result)
+    reparsed = parseString(ET.tostring(xml_result))
+    print reparsed.toprettyxml(indent="\t")
+
 print "All done. XML policy is ready."

@@ -5,6 +5,29 @@ ripe_db_url = "https://rest.db.ripe.net"
 default_db_source = "ripe"
 
 
+def get_policy_by_autnum(autnum):
+    db_reply = send_db_request(locator_url_builder("aut-num", autnum))
+    if "No Objects found" in db_reply or "Illegal input" in db_reply:
+        return None
+    return db_reply
+
+
+def get_filter_set(ftype, value):
+    # Can make requests for as-set, route-set
+    db_reply = send_db_request(locator_url_builder(ftype, value))
+    if "No Objects found" in db_reply or "Illegal input" in db_reply:
+        return None
+    return db_reply
+
+
+def get_routes_by_autnum(autnum):
+    db_reply = send_db_request(search_url_builder(autnum, "origin", "route", "route6"))
+    if "No Objects found" in db_reply or "Illegal input" in db_reply:
+        return None
+
+    return db_reply
+
+
 def locator_url_builder(db_type, db_key, db_source=default_db_source):
     """http://rest.db.ripe.net/ripe/aut-num/AS199664"""
     new_url = "/%s/%s/%s" % (db_source, db_type, db_key)
@@ -44,4 +67,3 @@ def send_db_request(dburl):
         pass
 
     return db_reply
-
