@@ -1,69 +1,79 @@
 __author__ = 'stavros'
 import requests
 
-ripe_db_url = "https://rest.db.ripe.net"
-default_db_source = "ripe"
+import libtools
 
 
-def get_policy_by_autnum(autnum):
-    db_reply = send_db_request(locator_url_builder("aut-num", autnum))
-    if "No Objects found" in db_reply or "Illegal input" in db_reply:
-        return None
-    return db_reply
+class Communicator:
+    def __init__(self, db_url, source):
+        self.db_url = db_url
+        self.source = source
 
+    def getPolicyByAutnum(self, autnum):
+        db_reply = None
+        try:
+            db_reply = self.sendDbRequest(self.locatorURLbuilder("aut-num", autnum))
+            libtools.d("Policy received for %s" % autnum)
+        except:
+            libtools.w("Failed to receive policy for %s" % autnum)
+            pass
 
-def get_filter_set(ftype, value):
-    # Can make requests for as-set, route-set
-    db_reply = send_db_request(locator_url_builder(ftype, value))
-    if "No Objects found" in db_reply or "Illegal input" in db_reply:
-        return None
-    return db_reply
+        return db_reply
 
+    def getFilterSet(self, ftype, value):
+        # Can make requests for as-set, route-set
+        db_reply = None
+        try:
+            db_reply = self.sendDbRequest(self.locatorURLbuilder(ftype, value))
+        except:
+            libtools.w('Get Filter failed for %s' % value)
+            pass
+        return db_reply
 
-def get_routes_by_autnum(autnum):
-    db_reply = send_db_request(search_url_builder(autnum, "origin", "route", "route6"))
-    if "No Objects found" in db_reply or "Illegal input" in db_reply:
-        return None
+    def getRoutesByAutnum(self, autnum):
+        db_reply = None
+        try:
+            db_reply = self.sendDbRequest(self.searchURLbuilder(autnum, "origin", "route", "route6"))
+        except:
+            libtools.w('Get all routes failed for %s' % autnum)
+            pass
+        return db_reply
 
-    return db_reply
+    def locatorURLbuilder(self, db_type, db_key):
+        """
+        Example url: http://rest.db.ripe.net/ripe/aut-num/AS199664
+        """
+        return self.db_url + "/%s/%s/%s" % (self.source, db_type, db_key)
 
+    def searchURLbuilder(self, query_string, inverse_attribute, type_filter1, type_filter2=None, flags=None):
+        """
+        Example:
+            http://rest.db.ripe.net/search.xml?query-string=as199664&type-filter=route6&inverse-attribute=origin
+        """
+        new_url = "/search.xml?query-string=%s" % query_string
+        if inverse_attribute is not None:
+            new_url += "&inverse-attribute=%s" % inverse_attribute
+        if type_filter1 is not None:
+            new_url += "&type-filter=%s" % type_filter1
+        if type_filter2 is not None:
+            new_url += "&type-filter=%s" % type_filter2
+        if flags is not None:
+            new_url += "&flags=%s" % flags
 
-def locator_url_builder(db_type, db_key, db_source=default_db_source):
-    """http://rest.db.ripe.net/ripe/aut-num/AS199664"""
-    new_url = "/%s/%s/%s" % (db_source, db_type, db_key)
-    # new_url = "search.xml?query-string=%s" % db_key
-    return ripe_db_url + new_url
+        return self.db_url + new_url
 
+    def sendDbRequest(self, db_url):
 
-def search_url_builder(query_string, inverse_attribute, type_filter1, type_filter2=None, flags=None):
-    """Example:
-        http://rest.db.ripe.net/search.xml?query-string=as199664&type-filter=route6&inverse-attribute=origin"""
-    new_url = "/search.xml?query-string=%s" % query_string
-    if inverse_attribute is not None:
-        new_url += "&inverse-attribute=%s" % inverse_attribute
-    if type_filter1 is not None:
-        new_url += "&type-filter=%s" % type_filter1
-    if type_filter2 is not None:
-        new_url += "&type-filter=%s" % type_filter2
-    if flags is not None:
-        new_url += "&flags=%s" % flags
-
-    return ripe_db_url + new_url
-
-
-def send_db_request(dburl):
-    db_reply = None
-    try:
-        # headers = {'Content-Type': 'application/json'}
-        headers = {'Accept': 'application/xml'}
-        r = requests.get(dburl, headers=headers)
-        if r.status_code == 200:
-            db_reply = r.text
-        elif r.status_code == 400:
-            db_reply = "Illegal input - incorrect value in one or more of the parameters"
-        elif r.status_code == 404:
-            db_reply = "No Objects found"
-    except:
-        pass
-
-    return db_reply
+        try:
+            # headers = {'Content-Type': 'application/json'}
+            headers = {'Accept': 'application/xml'}
+            r = requests.get(db_url, headers=headers)
+            if r.status_code == 200:
+                return r.text
+            elif r.status_code == 400:
+                raise Exception("Illegal input - incorrect value in one or more of the parameters")
+            elif r.status_code == 404:
+                raise Exception("No Objects found")
+        except:
+            # dunno, we got another type of Error
+            raise

@@ -1,5 +1,8 @@
 __author__ = 'stavros'
 import re
+import sys
+
+DEBUG = True
 
 # Python regular expressions for IPv4 and IPv6 addresses and URI-references,
 # based on RFC 3986's ABNF.
@@ -63,3 +66,22 @@ def is_valid_ipv6(item):
     if ipv6_address.match(item):
         return True
     return False
+
+
+# Exported functions
+
+
+def d(m, *args):
+    """ Print debug message. d('fnc_x dbg x=',1,'y=',2) """
+
+    if DEBUG:
+        for a in args:
+            m += ' ' + str(a)
+        sys.stderr.write(m + "\n")
+
+
+def w(m, *args):
+    """ Print warning message. d('fnc_x dbg x=',1,'y=',2) """
+    for a in args:
+        m += ' ' + str(a)
+    sys.stderr.write(m + "\n")
