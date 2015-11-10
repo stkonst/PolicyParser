@@ -81,30 +81,25 @@ class RouteObjectDir(object):
                 yield o
 
 
-class PolicyAction(object):
+class PolicyAction:
     # TODO Create a more detailed Action Machinery (see spliter)
-    def __init__(self):
-        self.order = 0
-        self.rp_attr = ''
-        self.rp_oper = ''
-        self.rp_val = ''
-
-    def assignValues(self, attr, operator, value):
+    def __init__(self, i, attr, oper, val):
+        self.order = i
         self.rp_attr = attr
-        self.rp_oper = operator
-        self.rp_val = value
+        self.rp_operator = oper
+        self.rp_value = val
 
     def __str__(self):
-        return '%s%s%s' % (self.rp_attr, self.rp_oper, self.rp_val)
+        return '%s%s%s' % (self.rp_attr, self.rp_operator, self.rp_value)
 
 
 class PolicyActionList:
-    def __init__(self):
-        self.actionList = list()
+    def __init__(self, direction):
+        self.actionDir = dict()
+        self.direction = direction
 
     def appendAction(self, PolicyAction):
-        self.actionList.append(PolicyAction)
-
+        self.actionDir[PolicyAction.order] = PolicyAction
 
 # Set-* objects
 
@@ -359,78 +354,82 @@ class RouteSetObject(RpslObject):
         return 'RouteSetbject: %s -< %s + %s' % (self.route_set, str(self.members), str(self.mp_members))
 
 
-class PeerAS(object):
+class PeerAS:
     def __init__(self, autnum):
-        self.ipv4 = False
-        self.ipv6 = False
         self.origin = autnum
-        self.localIPv4 = None
-        self.remoteIPv4 = None
-        self.localIPv6 = None
-        self.remoteIPv6 = None
-        self.v4imports = {'filters': set(), 'actions': list()}
-        self.v4exports = {'filters': set(), 'actions': list()}
-        self.v6imports = {'filters': set(), 'actions': list()}
-        self.v6exports = {'filters': set(), 'actions': list()}
-
-    def updatePeerIPs(self, local, remote, mp):
-        if mp:
-            self.localIPv6 = local
-            self.remoteIPv6 = remote
-        else:
-            self.localIPv4 = local
-            self.remoteIPv4 = remote
-
-    def appendImportActions(self, actions, mp=False):
-        if actions is not None:
-            if not mp:
-                self.v4imports['actions'] = list(actions)
-            else:
-                self.v6imports['actions'] = list(actions)
+        self.v4Filters = {'imports': set(), 'exports': set()}
+        self.v6Filters = {'imports': set(), 'exports': set()}
+        self.peeringPoints = dict()
 
     def appendImportFilters(self, filters, mp=False):
         if filters is not None:
             if not mp:
-                self.v4imports['filters'] = set(filters)
+                self.v4Filters['imports'] = set(filters)
             else:
-                self.v6imports['filters'] = set(filters)
-
-    def appendExportActions(self, actions, mp=False):
-        if actions is not None:
-            if not mp:
-                self.v4exports['actions'] = list(actions)
-            else:
-                self.v6exports['actions'] = list(actions)
+                self.v6Filters['imports'] = set(filters)
 
     def appendExportFilters(self, filters, mp=False):
         if filters is not None:
             if not mp:
-                self.v4exports['filters'] = set(filters)
+                self.v4Filters['exports'] = set(filters)
             else:
-                self.v6exports['filters'] = set(filters)
+                self.v6Filters['exports'] = set(filters)
+
+    def appendPeeringPoint(self, PeeringPoint):
+        self.peeringPoints[PeeringPoint.getKey()] = PeeringPoint
+
+    def returnPeeringPoint(self, pkey):
+        return self.peeringPoints[pkey]
+
+    def checkPeeringPointKey(self, pkey):
+        if pkey in self.peeringPoints:
+            return True
+        return False
 
     def getAllFilters(self):
 
         filter_set = set()
-        if self.ipv4:
-            filter_set.update(self.v4imports.get('filters'))
-            filter_set.update(self.v4exports.get('filters'))
-        if self.ipv6:
-            filter_set.update(self.v6imports.get('filters'))
-            filter_set.update(self.v6exports.get('filters'))
+        # if self.ipv4:
+        filter_set.update(self.v4Filters.get('imports'))
+        filter_set.update(self.v4Filters.get('exports'))
+        # if self.ipv6:
+        filter_set.update(self.v6Filters.get('imports'))
+        filter_set.update(self.v6Filters.get('exports'))
 
         return filter_set
 
+        # def __str__(self):
+        #     if not self.ipv6:
+        #         return "Peering %s with remote %s at local %s " % (self.origin, self.remoteIPv4, self.localIPv4)
+        #     else:
+        #         return "Peering %s with remote (%s ~ %s) at local (%s ~ %s) " % (
+        #         self.origin, self.remoteIPv4, self.remoteIPv6,
+        #         self.localIPv4, self.localIPv6)
+
+
+class PeeringPoint:
+    def __init__(self, mp):
+        self.local_ip = ""
+        self.remote_ip = ""
+        self.mp = mp
+        self.actions_in = PolicyActionList('import')
+        self.actions_out = PolicyActionList('export')
+
+    def appendAddresses(self, local, remote):
+        self.local_ip = local
+        self.remote_ip = remote
+
+    def getKey(self):
+        # pseudo key generator for dictionary appending
+        # if no IPs are present then actions_in are applied in
+        # every ingress/egress point of the domain
+        return str(self.local_ip) + "|" + str(self.remote_ip)
+
     def __str__(self):
-        if not self.ipv6:
-            return "Peering %s with remote %s at local %s " % (self.origin, self.remoteIPv4, self.localIPv4)
-        else:
-            return "Peering %s with remote (%s ~ %s) at local (%s ~ %s) " % (
-            self.origin, self.remoteIPv4, self.remoteIPv6,
-            self.localIPv4, self.localIPv6)
+        return "Local_IP: %s Remote_IP: %s" % (self.local_ip, self.remote_ip)
 
 
-class PeerObjDir(object):
+class PeerObjDir:
     def __init__(self):
         self.peerTable = {}
 

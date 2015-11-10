@@ -29,6 +29,8 @@ PFX_FLTR_PARSE = re.compile('^([0-9A-F:\.]+/[0-9]+)(\^[0-9\+-]+)?$')
 REGEXP_FLTR_PARSE = re.compile('^<([^>]+)>$')
 ''' End of Tomas' expressions for parsers '''
 
+ACTION_RESHAPE = re.compile(r'\s|[{\s*|\s*}]')
+
 
 class PolicyParser:
     def __init__(self, autnum, ipv4=True, ipv6=True):
@@ -68,17 +70,31 @@ class PolicyParser:
                 elif "mp-export" == elem.attrib.get("name"):
                     self.parseExport(elem.attrib.get("value").upper(), mp=True)
 
-    def extractIPs(self, policy_object, peer, mp=False):
+    def extractIPs(self, policy_object, PeeringPoint, mp=False):
 
         remoteIP = re.split('\sAT\s', policy_object, re.I)[0].split()[-1]
         localIP = re.split('\sACTION\s', policy_object, re.I)[0].split()[-1]
 
         if mp:
+            """ RPSL Allows also 1 out of the 2 IPs to exist. """
+            # TODO make it less strict and more flexible
             if tools.is_valid_ipv6(remoteIP) and tools.is_valid_ipv6(localIP):
-                peer.updatePeerIPs(localIP, remoteIP, mp)
-        else:
-            if tools.is_valid_ipv4(remoteIP) and tools.is_valid_ipv4(localIP):
-                peer.updatePeerIPs(localIP, remoteIP, mp)
+                PeeringPoint.appendAddresses(localIP, remoteIP)
+        elif tools.is_valid_ipv4(remoteIP) and tools.is_valid_ipv4(localIP):
+            PeeringPoint.appendAddresses(localIP, remoteIP)
+
+    def extractActions(self, line, PolicyActionList, mp=False):
+        actions = re.search(r'ACTION(.*)ACCEPT', line, re.I).group(1).split(";")
+
+        for i, a in enumerate(actions):
+            reshaped = re.sub(ACTION_RESHAPE, '', a)
+            if '.=' in reshaped:
+                # I know it's a HACK. But I will blame RPSL 4 that
+                items = reshaped.split('.=')
+                PolicyActionList.appendAction(rpsl.PolicyAction(i, items[0], ".=", items[1]))
+            elif "=" in reshaped:
+                items = reshaped.split('=')
+                PolicyActionList.appendAction(rpsl.PolicyAction(i, items[0], "=", items[1]))
 
     def parseImport(self, line, mp=False):
 
@@ -91,25 +107,24 @@ class PolicyParser:
             peer_as = self.peerings.returnPeering(peer_asnum)
         except:
             peer_as = rpsl.PeerAS(peer_asnum)
-            peer_as.ipv4 = True
-            peer_as.ipv6 = mp
             tools.d('New peering found (%s)' % peer_asnum)
-            # pass
 
         # First step: retrieve the filter items (Mandatory and multiple)
         filter_items = re.split('\.*ACCEPT\.*', line, re.I)[1].split()
         peer_as.appendImportFilters(filter_items)
 
-        # Second step: Check if there are any IPs of routers inside (Optional)
+        pp = rpsl.PeeringPoint(mp)
         if re.search('\sAT\s', line, re.I):
-            self.extractIPs(line, peer_as, mp)
+            """ WARNING: In case of peering on multiple network edges, more peering-IPs are present in the policy!!! """
+            self.extractIPs(line, pp, mp)
 
         # Before third step check if optional action(s) exist
         if "ACTION" in line:
-            #  TODO enumerate actions to get their order and append them in an ActionList
-            actions = re.search(r'ACTION(.*)ACCEPT', line, re.I).group(1).split(";")
-            peer_as.appendImportActions(actions, mp)
+            acList = rpsl.PolicyActionList("import")
+            self.extractActions(line, acList, mp)
+            pp.actions_in = acList
 
+        peer_as.appendPeeringPoint(pp)
         self.peerings.appentPeering(peer_as)
 
     def parseExport(self, line, mp=False):
@@ -123,20 +138,25 @@ class PolicyParser:
             peer_as = self.peerings.returnPeering(peer_asnum)
         except:
             peer_as = rpsl.PeerAS(peer_asnum)
-            peer_as.ipv4 = True
-            peer_as.ipv6 = mp
             tools.d('New peering found (%s)' % peer_asnum)
-            # pass
 
         # First get the announce (filter) items
         filter_items = re.split('\.*ANNOUNCE\.*', line, re.I)[1].split()
         peer_as.appendExportFilters(filter_items)
 
-        # Then let's receive the actions that need to be applied
+        pp = rpsl.PeeringPoint(mp)
+        if re.search('\sAT\s', line, re.I):
+            """ WARNING: In case of peering on multiple network edges, more peering-IPs are present in the policy!!! """
+            self.extractIPs(line, pp, mp)
+            if peer_as.checkPeeringPointKey(pp.getKey()):
+                pp = peer_as.returnPeeringPoint(pp.getKey())
+
+        # Then let's receive the actions_out that need to be applied
         if "ACTION" in line:
-            #  TODO enumerate actions to get their order and append them in an ActionList
-            actions = re.search(r'ACTION(.*)ANNOUNCE', line, re.I).group(1)
-            peer_as.appendExportActions(actions.split(";"))
+            #  TODO enumerate actions_in to get their order and append them in an ActionList
+            acList = rpsl.PolicyActionList("export")
+            self.extractActions(line, acList, mp)
+            pp.actions_out = acList
 
         self.peerings.appentPeering(peer_as)
 

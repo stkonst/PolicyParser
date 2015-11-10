@@ -1,7 +1,6 @@
 __author__ = 'stavros'
 import sys
 from xml.dom.minidom import parseString
-import xml.etree.ElementTree as ET
 
 import communicator
 import parsers
@@ -23,7 +22,7 @@ def collectPeeringFilters(allpeers):
     return filter_set
 
 
-def buildXMLpolicy(autnum, ipv4=True, ipv6=True):
+def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
     """ PreProcess section: Get own policy, parse and create necessary Data Structures """
     com = communicator.Communicator(ripe_db_url, default_db_source)
     pp = parsers.PolicyParser(autnum, ipv4, ipv6)
@@ -31,17 +30,31 @@ def buildXMLpolicy(autnum, ipv4=True, ipv6=True):
     pp.assignContent(com.getPolicyByAutnum(autnum))
     pp.readPolicy()
 
-    """ Process section: Resolve necessary filters into prefixes """
+    """ Process section: Resolve necessary filters into prefixes
+        Use Multithreading to fetch necessary info from RIPE DB. """
+    #
+    #
+    #
 
     """ PostProcess: Create and deliver the corresponding XML output """
     xmlgen = xmlGenerator.xmlGenerator(autnum, ipv4, ipv6)
     xmlgen.convertPeersToXML(pp.peerings)
-    return xmlgen.xml_policy
+
+    if output == "browser":
+        print "will return output for browser"
+        return xmlgen.__str__()
+    elif output == "screen":
+        reparsed = parseString(xmlgen.__str__())
+        return reparsed.toprettyxml(indent="\t")
+    elif output == 'file':
+        return xmlgen.__str__()
 
 # ~~~ Script starts here ~~~
 
+starting_flag = True
 if len(sys.argv) < 2:
     print "\nIncomplete number of parameters. \n%s\n" % help_message
+    starting_flag = False
 
 else:
     for arg in sys.argv:
@@ -50,6 +63,7 @@ else:
                 params["as_number"] = sys.argv[sys.argv.index('-a') + 1].upper()
             else:
                 print "Invalid aut-number"
+                starting_flag = False
                 exit(1)
         if arg == "-o":
             params["output_file"] = sys.argv[sys.argv.index('-o') + 1]
@@ -66,15 +80,14 @@ else:
 
 print "Configuration done. Initialising..."
 
-xml_result = buildXMLpolicy(params.get("as_number"))
-# buildXMLpolicy(params.get("as_number"))
+if starting_flag:
 
-# if "output_file" in params:
-#     f = open(params["output_file"], mode='w')
-#     f.write(ET.tostring(xml_result, encoding='utf-8'))
-#     f.close()
-# else:
-reparsed = parseString(ET.tostring(xml_result))
-print reparsed.toprettyxml(indent="\t")
+    if "output_file" in params:
+        xml_result = buildXMLpolicy(params.get("as_number"), output='file')
+        f = open(params["output_file"], mode='w')
+        f.write(xml_result)
+        f.close()
+    else:
+        print buildXMLpolicy(params.get("as_number"), output='screen')
 
-print "All done. XML policy is ready."
+    print "All done. XML policy is ready."

@@ -9,18 +9,22 @@ class xmlGenerator:
         self.ipv4_enabled = ipv4
         self.ipv6_enabled = ipv6
 
-    def getActionTemplate(self, action_items):
-        new_action = et.Element('actions')
-        if action_items is None:
-            return new_action
+    def getActionTemplate(self, PolicyActionList):
 
-        if action_items is not None:
-            for action in action_items:
-                if len(action) > 1:
-                    seperated = action.lower().split('=')
-                    new_action.set(seperated[0], seperated[1])
+        if PolicyActionList.direction == "import":
+            new_actions = et.Element('actions_in')
+        elif PolicyActionList.direction == "export":
+            new_actions = et.Element('actions_out')
 
-        return new_action
+        # TODO Insert order of applying actions_in
+        while PolicyActionList.actionDir:
+            i, ac = PolicyActionList.actionDir.popitem()
+            if ac.rp_operator == ".=":
+                new_actions.set(ac.rp_attr.lower(), "append(%s)" % ac.rp_value)
+            elif ac.rp_operator == "=":
+                new_actions.set(ac.rp_attr.lower(), ac.rp_value)
+
+        return new_actions
 
     def getFilterTemplate(self, filter_items):
         filters_root = et.Element('filters')
@@ -35,8 +39,7 @@ class xmlGenerator:
         return filters_root
 
     def createNewPrefixTemplate(self, version, prefix, origin):
-        new_prefix = et.Element("prefix")
-        new_prefix.set("version", version)
+        new_prefix = et.Element("prefix").set("version", version)
 
         if origin is not None:
             new_prefix.set("origin", origin.upper())
@@ -56,93 +59,81 @@ class xmlGenerator:
         return new_member
 
     def getRouteObjectTemplate(self, autnum):
-        template_root = et.Element("object")
-        template_root.set("aut-num", autnum.upper())
-        et.SubElement(template_root, "prefixes")
 
-        return template_root
+        return et.Element("object").set("aut-num", autnum.upper()).SubElement("prefixes")
 
     def getAS_setTemplate(self, as_set):
-        template_root = et.Element("filter")
-        template_root.set("name", as_set.upper())
-        et.SubElement(template_root, "members")
 
-        return template_root
+        return et.Element("filter").set("name", as_set.upper()).SubElement("members")
 
     def getRS_setTemplate(self, rs_set):
-        template_root = et.Element("filter")
-        template_root.set("name", rs_set.upper())
-        et.SubElement(template_root, "members")
 
-        return template_root
-
-    def getPeerTemplate(self, PeerAS):
-        template_root = et.Element('peer')
-        template_root.set("aut-num", PeerAS.origin)
-
-        # TODO Find a more clever way to avoid all these if
-        if PeerAS.localIPv4 is not None:
-            template_root.set('local-ipv4', PeerAS.localIPv4)
-
-        if PeerAS.remoteIPv4 is not None:
-            template_root.set('remote-ipv4', PeerAS.remoteIPv4)
-
-        if PeerAS.localIPv6 is not None:
-            template_root.set('local-ipv6', PeerAS.localIPv6)
-
-        if PeerAS.remoteIPv6 is not None:
-            template_root.set('remote-ipv6', PeerAS.remoteIPv6)
-
-        # et.SubElement(template_root, 'default')
-        # et.SubElement(template_root, 'mp-default')
-
-        return template_root
+        return et.Element("filter").set("name", rs_set.upper()).SubElement("members")
 
     def getPolicyTemplate(self, autnum):
+
         template_root = et.Element('root')
         template_root.append(et.Comment('This is a resolved XML policy file for ' + autnum))
 
-        # First place the route/route6 objects per AS
         et.SubElement(template_root, 'route-objects')
 
-        # Then place the AS-Sets
         et.SubElement(template_root, 'as-sets')
 
-        # Then place the RS-Sets
         et.SubElement(template_root, 'rs-sets')
 
-        # That comes later
         et.SubElement(template_root, 'peering-policy')
 
         return template_root
 
+    def peeringPointToXML(self, points_root, PeeringPoint):
+
+        if PeeringPoint.getKey() is not "|":
+            if PeeringPoint.mp:
+                pp_root = et.Element('peering-point')
+                pp_root.set("type", "IPv6")
+            else:
+                pp_root = et.Element('peering-point')
+                pp_root.set("type", "IPv4")
+
+            p = et.SubElement(pp_root, "point")
+            p.set("local-IP", PeeringPoint.local_ip)
+            p.set("remote-IP", PeeringPoint.remote_ip)
+            p.append(self.getActionTemplate(PeeringPoint.actions_in))
+            p.append(self.getActionTemplate(PeeringPoint.actions_out))
+
+            points_root.append(pp_root)
+
+        else:
+            points_root.append(self.getActionTemplate(PeeringPoint.actions_in))
+            points_root.append(self.getActionTemplate(PeeringPoint.actions_out))
+
     def peerToXML(self, PeerAS):
-        template_root = self.getPeerTemplate(PeerAS)
 
-        if PeerAS.ipv4:
+        template_root = et.Element('peer')
+        template_root.set("aut-num", PeerAS.origin)
+
+        points = et.SubElement(template_root, 'peering-points')
+        for pp in PeerAS.peeringPoints.itervalues():
+            # points.append(self.peeringPointToXML(pp))
+            self.peeringPointToXML(points, pp)
+
+        if self.ipv4_enabled:
             im = et.SubElement(template_root, 'imports')
-            im.append(self.getActionTemplate(PeerAS.v4imports.get('actions')))
-            im.append(self.getFilterTemplate(PeerAS.v4imports.get('filters')))
-
+            im.append(self.getFilterTemplate(PeerAS.v4Filters.get('imports')))
             ex = et.SubElement(template_root, 'exports')
-            ex.append(self.getActionTemplate(PeerAS.v4exports.get('actions')))
-            ex.append(self.getFilterTemplate(PeerAS.v4exports.get('filters')))
+            ex.append(self.getFilterTemplate(PeerAS.v4Filters.get('exports')))
 
-        if PeerAS.ipv6:
-            im6 = et.SubElement(template_root, 'mp-imports')
-            im6.append(self.getActionTemplate(PeerAS.v6imports.get('actions')))
-            im6.append(self.getFilterTemplate(PeerAS.v6imports.get('filters')))
-
-            ex6 = et.SubElement(template_root, 'mp-exports')
-            ex6.append(self.getActionTemplate(PeerAS.v6exports.get('actions')))
-            ex6.append(self.getFilterTemplate(PeerAS.v6exports.get('filters')))
+        if self.ipv6_enabled:
+            im = et.SubElement(template_root, 'mp-imports')
+            im.append(self.getFilterTemplate(PeerAS.v6Filters.get('imports')))
+            ex = et.SubElement(template_root, 'mp-exports')
+            ex.append(self.getFilterTemplate(PeerAS.v6Filters.get('exports')))
 
         return template_root
 
     def convertPeersToXML(self, PeerObjDir):
-        pointer = self.xml_policy.find('peering-policy')
         for p, val in PeerObjDir.peerTable.iteritems():
-            pointer.append(self.peerToXML(val))
+            self.xml_policy.find('peering-policy').append(self.peerToXML(val))
 
     def __str__(self):
-        return et.dump(self.xml_policy)
+        return et.tostring(self.xml_policy, encoding='UTF-8')
