@@ -55,20 +55,36 @@ class PolicyParser:
             if self.ipv4_enabled:
 
                 if "import" == elem.attrib.get("name"):
-                    self.parseImport(elem.attrib.get("value").upper())
-                    line_parsed = True
+                    try:
+                        self.parseImport(elem.attrib.get("value").upper())
+                        line_parsed = True
+                    except:
+                        tools.w("Failed to parse import {%s}" % elem.attrib.get("value"))
+                        pass
 
                 elif "export" == elem.attrib.get("name"):
-                    self.parseExport(elem.attrib.get("value").upper())
-                    line_parsed = True
+                    try:
+                        self.parseExport(elem.attrib.get("value").upper())
+                        line_parsed = True
+                    except:
+                        tools.w("Failed to parse export {%s}" % elem.attrib.get("value"))
+                        pass
 
             if not line_parsed and self.ipv6_enabled:
 
                 if "mp-import" == elem.attrib.get("name"):
-                    self.parseImport(elem.attrib.get("value").upper(), mp=True)
+                    try:
+                        self.parseImport(elem.attrib.get("value").upper(), mp=True)
+                    except:
+                        tools.w("Failed to parse import {%s}" % elem.attrib.get("value"))
+                        pass
 
                 elif "mp-export" == elem.attrib.get("name"):
-                    self.parseExport(elem.attrib.get("value").upper(), mp=True)
+                    try:
+                        self.parseExport(elem.attrib.get("value").upper(), mp=True)
+                    except:
+                        tools.w("Failed to parse export {%s}" % elem.attrib.get("value"))
+                        pass
 
     def extractIPs(self, policy_object, PeeringPoint, mp=False):
 
@@ -83,8 +99,12 @@ class PolicyParser:
         elif tools.is_valid_ipv4(remoteIP) and tools.is_valid_ipv4(localIP):
             PeeringPoint.appendAddresses(localIP, remoteIP)
 
-    def extractActions(self, line, PolicyActionList, mp=False):
-        actions = re.search(r'ACTION(.*)ACCEPT', line, re.I).group(1).split(";")
+    def extractActions(self, line, PolicyActionList, export=False):
+
+        if export:
+            actions = re.search(r'ACTION(.*)ANNOUNCE', line, re.I).group(1).split(";")
+        else:
+            actions = re.search(r'ACTION(.*)ACCEPT', line, re.I).group(1).split(";")
 
         for i, a in enumerate(actions):
             reshaped = re.sub(ACTION_RESHAPE, '', a)
@@ -92,7 +112,7 @@ class PolicyParser:
                 # I know it's a HACK. But I will blame RPSL 4 that
                 items = reshaped.split('.=')
                 PolicyActionList.appendAction(rpsl.PolicyAction(i, items[0], ".=", items[1]))
-            elif "=" in reshaped:
+            elif '=' in reshaped:
                 items = reshaped.split('=')
                 PolicyActionList.appendAction(rpsl.PolicyAction(i, items[0], "=", items[1]))
 
@@ -117,11 +137,13 @@ class PolicyParser:
         if re.search('\sAT\s', line, re.I):
             """ WARNING: In case of peering on multiple network edges, more peering-IPs are present in the policy!!! """
             self.extractIPs(line, pp, mp)
+        if peer_as.checkPeeringPointKey(pp.getKey()):
+            pp = peer_as.returnPeeringPoint(pp.getKey())
 
         # Before third step check if optional action(s) exist
         if "ACTION" in line:
             acList = rpsl.PolicyActionList("import")
-            self.extractActions(line, acList, mp)
+            self.extractActions(line, acList)
             pp.actions_in = acList
 
         peer_as.appendPeeringPoint(pp)
@@ -148,14 +170,14 @@ class PolicyParser:
         if re.search('\sAT\s', line, re.I):
             """ WARNING: In case of peering on multiple network edges, more peering-IPs are present in the policy!!! """
             self.extractIPs(line, pp, mp)
-            if peer_as.checkPeeringPointKey(pp.getKey()):
-                pp = peer_as.returnPeeringPoint(pp.getKey())
+        if peer_as.checkPeeringPointKey(pp.getKey()):
+            pp = peer_as.returnPeeringPoint(pp.getKey())
 
         # Then let's receive the actions_out that need to be applied
         if "ACTION" in line:
             #  TODO enumerate actions_in to get their order and append them in an ActionList
             acList = rpsl.PolicyActionList("export")
-            self.extractActions(line, acList, mp)
+            self.extractActions(line, acList, mp, export=True)
             pp.actions_out = acList
 
         self.peerings.appentPeering(peer_as)

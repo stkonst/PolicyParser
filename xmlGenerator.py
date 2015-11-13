@@ -16,7 +16,7 @@ class xmlGenerator:
         elif PolicyActionList.direction == "export":
             new_actions = et.Element('actions_out')
 
-        # TODO Insert order of applying actions_in
+        # TODO Insert order of applying actions
         while PolicyActionList.actionDir:
             i, ac = PolicyActionList.actionDir.popitem()
             if ac.rp_operator == ".=":
