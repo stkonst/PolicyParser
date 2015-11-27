@@ -357,23 +357,27 @@ class RouteSetObject(RpslObject):
 class PeerAS:
     def __init__(self, autnum):
         self.origin = autnum
-        self.v4Filters = {'imports': set(), 'exports': set()}
-        self.v6Filters = {'imports': set(), 'exports': set()}
+        self.v4Filters = {'imports': "", 'exports': ""}
+        self.v6Filters = {'imports': "", 'exports': ""}
         self.peeringPoints = dict()
 
     def appendImportFilters(self, filters, mp=False):
         if filters is not None:
             if not mp:
-                self.v4Filters['imports'] = set(filters)
+                # self.v4Filters['imports'] = set(filters)
+                self.v4Filters['imports'] = filters
             else:
-                self.v6Filters['imports'] = set(filters)
+                # self.v6Filters['imports'] = set(filters)
+                self.v6Filters['imports'] = filters
 
     def appendExportFilters(self, filters, mp=False):
         if filters is not None:
             if not mp:
-                self.v4Filters['exports'] = set(filters)
+                # self.v4Filters['exports'] = set(filters)
+                self.v4Filters['exports'] = filters
             else:
-                self.v6Filters['exports'] = set(filters)
+                # self.v6Filters['exports'] = set(filters)
+                self.v6Filters['exports'] = filters
 
     def appendPeeringPoint(self, PeeringPoint):
         self.peeringPoints[PeeringPoint.getKey()] = PeeringPoint
@@ -420,13 +424,15 @@ class PeeringPoint:
         self.remote_ip = remote
 
     def getKey(self):
-        # pseudo key generator for dictionary appending
-        # if no IPs are present then actions_in are applied in
-        # every ingress/egress point of the domain
+        """
+        Pseudo key generator for dictionary appending
+        if no IPs are present then actions_in are applied in
+        every ingress/egress point of the domain
+        """
         return str(self.local_ip) + "|" + str(self.remote_ip)
 
     def __str__(self):
-        return "Local_IP: %s Remote_IP: %s" % (self.local_ip, self.remote_ip)
+        yield "Local_IP: %s Remote_IP: %s" % (self.local_ip, self.remote_ip)
 
 
 class PeerObjDir:
@@ -446,3 +452,36 @@ class PeerObjDir:
         for k in self.peerTable.keys():
             for o in self.peerTable[k]:
                 yield o
+
+
+class peerFilter:
+    """
+    We define 4 types of resolved (or not resolved) filters:
+    0: No type has been assigned, therefore the filter has not been resolved and shall be rejected.
+    1: Prefix_List (the filter is resolved in a complete prefix list and can be transferred into the router)
+    2: AS_Path (The filter is an AS path expression and needs to be copied into the router accordingly)
+    3: REGEX (The filter is a Regular Expression and needs to be transferred in the router correctly)
+    4: COMBI (The filter is a combination of the other types)
+    """
+
+    def __init__(self, hv, expr):
+        self.hashValue = hv
+        self.expression = expr
+        self.type = 0
+
+    def __str__(self):
+        yield str(self.hashValue) + " -> " + self.expression
+
+
+class peerFilterDir:
+    def __init__(self):
+        self.filterTable = {}
+
+    def appendFilter(self, peerFilter):
+        self.filterTable[peerFilter.hashValue] = peerFilter
+
+    def returnFilter(self, hashVal):
+        return self.filterTable[hashVal]
+
+    def number_of_filters(self):
+        return len(self.filterTable.keys())

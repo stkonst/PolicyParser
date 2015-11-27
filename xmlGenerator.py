@@ -26,15 +26,13 @@ class xmlGenerator:
 
         return new_actions
 
-    def getFilterTemplate(self, filter_items):
+    def getFilterTemplate(self, item):
         filters_root = et.Element('filters')
-        if filter_items is None:
+        if item is None:
             return filters_root
 
-        for item in filter_items:
-            if "ANY" != item:
-                f = et.SubElement(filters_root, "filter")
-                f.text = item
+        f = et.SubElement(filters_root, "filter")
+        f.text = item
 
         return filters_root
 
@@ -75,15 +73,19 @@ class xmlGenerator:
         template_root = et.Element('root')
         template_root.append(et.Comment('This is a resolved XML policy file for ' + autnum))
 
-        et.SubElement(template_root, 'route-objects')
-
-        et.SubElement(template_root, 'as-sets')
-
-        et.SubElement(template_root, 'rs-sets')
+        et.SubElement(template_root, 'peering-filters')
 
         et.SubElement(template_root, 'peering-policy')
 
         return template_root
+
+    def filterToXML(self, peerFilter):
+
+        fltr_root = et.Element('peering-filter',
+                               attrib={"type": str(peerFilter.type), "hash-value": peerFilter.hashValue})
+        et.SubElement(fltr_root, "expression").text = peerFilter.expression
+
+        return fltr_root
 
     def peeringPointToXML(self, points_root, PeeringPoint):
 
@@ -130,6 +132,10 @@ class xmlGenerator:
             ex.append(self.getFilterTemplate(PeerAS.v6Filters.get('exports')))
 
         return template_root
+
+    def convertFiltersToXML(self, peerFilterDir):
+        for p, val in peerFilterDir.filterTable.iteritems():
+            self.xml_policy.find('peering-filters').append(self.filterToXML(val))
 
     def convertPeersToXML(self, PeerObjDir):
         for p, val in PeerObjDir.peerTable.iteritems():

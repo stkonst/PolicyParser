@@ -1,6 +1,7 @@
 __author__ = 'stavros'
 import xml.etree.ElementTree as et
 import re
+import xxhash
 
 import libtools as tools
 import rpsl
@@ -39,6 +40,7 @@ class PolicyParser:
         self.ipv4_enabled = ipv4
         self.ipv6_enabled = ipv6
         self.peerings = rpsl.PeerObjDir()
+        self.filters = rpsl.peerFilterDir()
 
     def assignContent(self, xmltext):
         try:
@@ -125,22 +127,28 @@ class PolicyParser:
 
         try:
             peer_as = self.peerings.returnPeering(peer_asnum)
-        except:
+        except Exception:
             peer_as = rpsl.PeerAS(peer_asnum)
             tools.d('New peering found (%s)' % peer_asnum)
+            pass
 
-        # First step: retrieve the filter items (Mandatory and multiple)
-        filter_items = re.split('\.*ACCEPT\.*', line, re.I)[1].split()
-        peer_as.appendImportFilters(filter_items)
+        filter_items = re.split('\.*ACCEPT\.*', line, re.I)[1].strip()
+        if filter_items:
+            pf = rpsl.peerFilter(str(xxhash.xxh64(filter_items).hexdigest()), str(filter_items))
+            peer_as.appendImportFilters(pf.hashValue, mp)
+            self.filters.appendFilter(pf)
 
         pp = rpsl.PeeringPoint(mp)
         if re.search('\sAT\s', line, re.I):
-            """ WARNING: In case of peering on multiple network edges, more peering-IPs are present in the policy!!! """
+            """ === WARNING ===
+            In case of peering on multiple network edges,
+            more peering-IPs are present in the policy!!!
+            """
             self.extractIPs(line, pp, mp)
         if peer_as.checkPeeringPointKey(pp.getKey()):
             pp = peer_as.returnPeeringPoint(pp.getKey())
 
-        # Before third step check if optional action(s) exist
+        # check if optional action(s) exist
         if "ACTION" in line:
             acList = rpsl.PolicyActionList("import")
             self.extractActions(line, acList)
@@ -158,13 +166,16 @@ class PolicyParser:
 
         try:
             peer_as = self.peerings.returnPeering(peer_asnum)
-        except:
+        except Exception:
             peer_as = rpsl.PeerAS(peer_asnum)
             tools.d('New peering found (%s)' % peer_asnum)
+            pass
 
-        # First get the announce (filter) items
-        filter_items = re.split('\.*ANNOUNCE\.*', line, re.I)[1].split()
-        peer_as.appendExportFilters(filter_items)
+        filter_items = re.split('\.*ANNOUNCE\.*', line, re.I)[1].strip()
+        if filter_items:
+            pf = rpsl.peerFilter(str(xxhash.xxh64(filter_items).hexdigest()), str(filter_items))
+            peer_as.appendExportFilters(pf.hashValue, mp)
+            self.filters.appendFilter(pf)
 
         pp = rpsl.PeeringPoint(mp)
         if re.search('\sAT\s', line, re.I):
@@ -175,7 +186,6 @@ class PolicyParser:
 
         # Then let's receive the actions_out that need to be applied
         if "ACTION" in line:
-            #  TODO enumerate actions_in to get their order and append them in an ActionList
             acList = rpsl.PolicyActionList("export")
             self.extractActions(line, acList, mp, export=True)
             pp.actions_out = acList

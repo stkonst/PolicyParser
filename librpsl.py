@@ -13,15 +13,6 @@ default_db_source = "ripe"
 params = dict()
 
 
-def collectPeeringFilters(allpeers):
-    filter_set = set()
-    for val in allpeers.itervalues():
-        filter_set.update(val.getAllFilters())
-
-    print "Found %s filters to resolve." % len(filter_set)
-    return filter_set
-
-
 def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
     """ PreProcess section: Get own policy, parse and create necessary Data Structures """
     com = communicator.Communicator(ripe_db_url, default_db_source)
@@ -30,6 +21,7 @@ def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
     pp.assignContent(com.getPolicyByAutnum(autnum))
     pp.readPolicy()
 
+    tools.d("Found %s filters to resolve" % pp.filters.number_of_filters())
     """ Process section: Resolve necessary filters into prefixes
         Use Multithreading to fetch necessary info from RIPE DB. """
     #
@@ -39,14 +31,14 @@ def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
     """ PostProcess: Create and deliver the corresponding XML output """
     xmlgen = xmlGenerator.xmlGenerator(autnum, ipv4, ipv6)
     xmlgen.convertPeersToXML(pp.peerings)
+    xmlgen.convertFiltersToXML(pp.filters)
 
     if output == "browser":
-        print "will return output for browser"
         return xmlgen.__str__()
     elif output == "screen":
         reparsed = parseString(xmlgen.__str__())
         return reparsed.toprettyxml(indent="\t")
-    elif output == 'file':
+    elif output == "file":
         return xmlgen.__str__()
 
 # ~~~ Script starts here ~~~

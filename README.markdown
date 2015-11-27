@@ -1,5 +1,6 @@
 Libraries required
 python requests 2.8.0
+python xxhash 0.4.3
 
 Init flags and parameters
 
