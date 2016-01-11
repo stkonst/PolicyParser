@@ -133,7 +133,7 @@ class PolicyParser:
             pass
 
         filter_items = re.split('\.*ACCEPT\.*', line, re.I)[1].strip()
-        if filter_items:
+        if filter_items and filter_items is not ("ANY" or "any"):  # Improve
             pf = rpsl.peerFilter(str(xxhash.xxh64(filter_items).hexdigest()), str(filter_items))
             peer_as.appendImportFilters(pf.hashValue, mp)
             self.filters.appendFilter(pf)
@@ -172,7 +172,7 @@ class PolicyParser:
             pass
 
         filter_items = re.split('\.*ANNOUNCE\.*', line, re.I)[1].strip()
-        if filter_items:
+        if filter_items and filter_items is not ("ANY" or "any"):
             pf = rpsl.peerFilter(str(xxhash.xxh64(filter_items).hexdigest()), str(filter_items))
             peer_as.appendExportFilters(pf.hashValue, mp)
             self.filters.appendFilter(pf)
