@@ -1,4 +1,4 @@
-__author__ = 'stavros'
+__author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl)'
 import xml.etree.ElementTree as et
 
 

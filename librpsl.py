@@ -1,8 +1,9 @@
-__author__ = 'stavros'
+__author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl)'
 import sys
 from xml.dom.minidom import parseString
 
 import communicator
+import rpsl
 import parsers
 import xmlGenerator
 import libtools as tools
@@ -24,6 +25,12 @@ def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
     tools.d("Found %s filters to resolve" % pp.filters.number_of_filters())
     """ Process section: Resolve necessary filters into prefixes
         Use Multithreading to fetch necessary info from RIPE DB. """
+
+    # count = round(pp.filters.number_of_filters() * 0.1)
+    # last = pp.filters.number_of_filters() - (count*9)
+    # print "Per thread: %s, Last thread: %s" % (count, last)
+    ' TODO: Implement multi-threading to resolve filters'
+
     #
     #
     #
@@ -51,7 +58,7 @@ if len(sys.argv) < 2:
 else:
     for arg in sys.argv:
         if arg == "-a":
-            if tools.check_autnum_validity(sys.argv[sys.argv.index('-a') + 1]):
+            if rpsl.check_autnum_validity(sys.argv[sys.argv.index('-a') + 1]):
                 params["as_number"] = sys.argv[sys.argv.index('-a') + 1].upper()
             else:
                 print "Invalid aut-number"

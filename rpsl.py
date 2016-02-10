@@ -1,5 +1,61 @@
-__author__ = 'stavros'
-__author__ += 'Tomas Hlavacek (tmshlvck@gmail.com)'
+__author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl) '
+__author__ += 'Tomas Hlavacek (tmshlvck@gmail.com) '
+import re
+
+ASN_MATCH = re.compile('^AS[0-9]+$')
+PFX_FLTR_MATCH = re.compile('^\{([^}]*)\}(\^[0-9\+-]+)?$')
+PFX_FLTR_PARSE = re.compile('^([0-9A-F:\.]+/[0-9]+)(\^[0-9\+-]+)?$')
+REGEXP_FLTR_PARSE = re.compile('^<([^>]+)>$')
+
+asnum_pattern = re.compile('AS\d+$', re.I)
+as_set_pattern = re.compile('(AS\d+:)*AS-(\w|-)*', re.I)
+rs_set_pattern = re.compile('RS-(\w|-)*', re.I)
+rtr_set_pattern = re.compile('RTR-(\w|-)*', re.I)
+filter_set_pattern = re.compile('FLTR-(\w|-)*', re.I)
+
+asname_pattern = re.compile('AS-(\w)*(\w)', re.I)
+
+
+def isASN(asn):
+    return ASN_MATCH.match(str(asn).strip()) != None
+
+
+def isPfxFilter(fltr):
+    return PFX_FLTR_MATCH.match(fltr) != None
+
+
+def isPfx(pfx):
+    return PFX_FLTR_PARSE.match(pfx) != None
+
+
+def check_autnum_validity(autnum):
+    if asnum_pattern.match(autnum):
+        return True
+    return False
+
+
+def check_as_set_validity(as_set):
+    if as_set_pattern.match(as_set):
+        return True
+    return False
+
+
+def check_rtr_set_validity(rtr_set):
+    if rtr_set_pattern.match(rtr_set):
+        return True
+    return False
+
+
+def check_rs_set_validity(rs_set):
+    if rs_set_pattern.match(rs_set):
+        return True
+    return False
+
+
+def check_fltr_set_validity(fltr_set):
+    if filter_set_pattern.match(fltr_set):
+        return True
+    return False
 
 
 class RpslObject(object):
@@ -101,6 +157,7 @@ class PolicyActionList:
     def appendAction(self, PolicyAction):
         self.actionDir[PolicyAction.order] = PolicyAction
 
+
 # Set-* objects
 
 class AsSetObject(RpslObject):
@@ -121,62 +178,62 @@ class AsSetObject(RpslObject):
         according to RPSL specs. """
         return str(name).upper().find('AS-') > -1
 
-    def __init__(self, textlines):
-        RpslObject.__init__(self, textlines)
-        self.as_set = None
+    def __init__(self, name):
+        RpslObject.__init__(self)
+        self.as_set = name
         self.members = []
 
-        for (a, v) in RpslObject.splitLines(self.text):
-            if a == self.ASSET_ATTR:
-                self.as_set = v.strip().upper()
-
-            elif a == self.MEMBERS_ATTR:
-                # flatten the list in case we have this:
-                # members: AS123, AS456, AS-SOMETHING
-                # members: AS234, AS-SMTHNG
-                for m in AsSetObject._parseMembers(v):
-                    self.members.append(m)
-
-            else:
-                pass  # ignore unrecognized lines
-
-        if not self.as_set:
-            raise Exception("Can not create AsSetObject out of text: " + str(textlines))
+        # for (a, v) in RpslObject.splitLines(self.text):
+        #     if a == self.ASSET_ATTR:
+        #         self.as_set = v.strip().upper()
+        #
+        #     elif a == self.MEMBERS_ATTR:
+        #         # flatten the list in case we have this:
+        #         # members: AS123, AS456, AS-SOMETHING
+        #         # members: AS234, AS-SMTHNG
+        #         for m in AsSetObject._parseMembers(v):
+        #             self.members.append(m)
+        #
+        #     else:
+        #         pass  # ignore unrecognized lines
+        #
+        # if not self.as_set:
+        #     raise Exception("Can not create AsSetObject out of text: " + str(textlines))
 
     def getKey(self):
         return self.as_set
 
-    def recursiveMatch(self, target, hashObjDir, recursionList=None):
-        """
-        This methods does recursion in the objects members and tries to find match
-        with the target identifier.
-
-        This is being used by filter matching instead of full filter recursion because we
-        know that this type of object could hold only ASNs or references to another
-        as-sets and therefore full filter recursion is not needed and this special
-        recursion offers mild speedup.
-        """
-
-        if recursionList == None:
-            recursionList = []
-
-        # common.d("AsSetObject recursiveMatch: target", target, 'in', self.getKey(), 'recursionList', recursionList)
-        #        common.d("Members:", self.members)
-        # prevent recusion loop
-        if self.getKey() in recursionList:
-            return False
-        recursionList.append(self.getKey())
-
-        if target in self.members:
-            return True
-
-        for m in self.members:
-            if self.isAsSet(m) and m in hashObjDir.table:
-                r = hashObjDir.table[m].recursiveMatch(target, hashObjDir, recursionList)
-                if r:
-                    return True
-
-        return False
+    # def recursiveMatch(self, target, hashObjDir, recursionList=None):
+    #     """
+    #     This methods does recursion in the objects members and tries to find analyser
+    #     with the target identifier.
+    #
+    #     This is being used by filter matching instead of full filter recursion because we
+    #     know that this type of object could hold only ASNs or references to another
+    #     as-sets and therefore full filter recursion is not needed and this special
+    #     recursion offers mild speedup.
+    #     """
+    #
+    #     if recursionList == None:
+    #         recursionList = []
+    #
+    #     # common.d("AsSetObject recursiveMatch: target", target, 'in', self.getKey(), 'recursionList', recursionList)
+    #     #        common.d("Members:", self.members)
+    #     # prevent recusion loop
+    #     if self.getKey() in recursionList:
+    #         return False
+    #     recursionList.append(self.getKey())
+    #
+    #     if target in self.members:
+    #         return True
+    #
+    #     for m in self.members:
+    #         if self.isAsSet(m) and m in hashObjDir.table:
+    #             r = hashObjDir.table[m].recursiveMatch(target, hashObjDir, recursionList)
+    #             if r:
+    #                 return True
+    #
+    #     return False
 
     def __str__(self):
         return 'AsSetObject: %s -< %s' % (self.as_set, str(self.members))
@@ -225,37 +282,37 @@ class PeeringSetObject(RpslObject):
     def getKey(self):
         return self.peering_set
 
-    def recursiveMatch(self, target, hashObjDir, recursionList=None):
-        """
-        This methods does recusion in the objects peering and mp-peering sections
-        and tries to find match with the target identifier.
-
-        This is being used by filter matching instead of full filter recursion because we
-        know that this type of object could hold only ASNs or references to another
-        peering-sets and therefore full filter recursion is not needed and this special
-        recursion offers mild speedup.
-        """
-        if recursionList == None:
-            recursionList = []
-
-        # common.d("PeeringSetObject recursiveMatch: target", target, 'in', self.getKey(),
-        #          'recursionList', recursionList)
-
-        # prevent recusion loop
-        if self.getKey() in recursionList:
-            return False
-        recursionList.append(self.getKey())
-
-        if target in self.peering or target in self.mp_peering:
-            return True
-
-        for m in (self.peering + self.mp_peering):
-            if self.isPeeringSet(m) and m in hashObjDir.table:
-                r = hashObjDir.table[m].recursiveMatch(target, hashObjDir, recursionList)
-                if r:
-                    return True
-
-        return False
+    # def recursiveMatch(self, target, hashObjDir, recursionList=None):
+    #     """
+    #     This methods does recusion in the objects peering and mp-peering sections
+    #     and tries to find analyser with the target identifier.
+    #
+    #     This is being used by filter matching instead of full filter recursion because we
+    #     know that this type of object could hold only ASNs or references to another
+    #     peering-sets and therefore full filter recursion is not needed and this special
+    #     recursion offers mild speedup.
+    #     """
+    #     if recursionList == None:
+    #         recursionList = []
+    #
+    #     # common.d("PeeringSetObject recursiveMatch: target", target, 'in', self.getKey(),
+    #     #          'recursionList', recursionList)
+    #
+    #     # prevent recusion loop
+    #     if self.getKey() in recursionList:
+    #         return False
+    #     recursionList.append(self.getKey())
+    #
+    #     if target in self.peering or target in self.mp_peering:
+    #         return True
+    #
+    #     for m in (self.peering + self.mp_peering):
+    #         if self.isPeeringSet(m) and m in hashObjDir.table:
+    #             r = hashObjDir.table[m].recursiveMatch(target, hashObjDir, recursionList)
+    #             if r:
+    #                 return True
+    #
+    #     return False
 
     def __str__(self):
         return 'PeeringSetObject: %s -< %s mp: %s' % (self.peering_set, str(self.peering), str(self.mp_peering))
@@ -354,6 +411,9 @@ class RouteSetObject(RpslObject):
         return 'RouteSetbject: %s -< %s + %s' % (self.route_set, str(self.members), str(self.mp_members))
 
 
+##################
+#   MY PART      #
+##################
 class PeerAS:
     def __init__(self, autnum):
         self.origin = autnum
