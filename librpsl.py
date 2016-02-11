@@ -58,7 +58,7 @@ if len(sys.argv) < 2:
 else:
     for arg in sys.argv:
         if arg == "-a":
-            if rpsl.check_autnum_validity(sys.argv[sys.argv.index('-a') + 1]):
+            if rpsl.is_ASN(sys.argv[sys.argv.index('-a') + 1]):
                 params["as_number"] = sys.argv[sys.argv.index('-a') + 1].upper()
             else:
                 print "Invalid aut-number"

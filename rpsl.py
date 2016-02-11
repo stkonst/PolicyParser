@@ -6,56 +6,38 @@ ASN_MATCH = re.compile('^AS[0-9]+$')
 PFX_FLTR_MATCH = re.compile('^\{([^}]*)\}(\^[0-9\+-]+)?$')
 PFX_FLTR_PARSE = re.compile('^([0-9A-F:\.]+/[0-9]+)(\^[0-9\+-]+)?$')
 REGEXP_FLTR_PARSE = re.compile('^<([^>]+)>$')
-
-asnum_pattern = re.compile('AS\d+$', re.I)
-as_set_pattern = re.compile('(AS\d+:)*AS-(\w|-)*', re.I)
-rs_set_pattern = re.compile('RS-(\w|-)*', re.I)
-rtr_set_pattern = re.compile('RTR-(\w|-)*', re.I)
-filter_set_pattern = re.compile('FLTR-(\w|-)*', re.I)
-
-asname_pattern = re.compile('AS-(\w)*(\w)', re.I)
+AS_SET_MATCH = re.compile('^(AS\d+:)*AS-(\w|-)*$', re.I)
+RS_SET_MATCH = re.compile('^RS-(\w|-)*$', re.I)
+RTR_SET_MATCH = re.compile('^RTR-(\w|-)*$', re.I)
+FLTR_SET_MATCH = re.compile('^FLTR-(\w|-)*$', re.I)
 
 
-def isASN(asn):
+def is_ASN(asn):
     return ASN_MATCH.match(str(asn).strip()) != None
 
 
-def isPfxFilter(fltr):
+def is_pfx_filter(fltr):
     return PFX_FLTR_MATCH.match(fltr) != None
 
 
-def isPfx(pfx):
+def is_pfx(pfx):
     return PFX_FLTR_PARSE.match(pfx) != None
 
 
-def check_autnum_validity(autnum):
-    if asnum_pattern.match(autnum):
-        return True
-    return False
+def is_AS_set(as_set):
+    return AS_SET_MATCH.match(as_set) != None
 
 
-def check_as_set_validity(as_set):
-    if as_set_pattern.match(as_set):
-        return True
-    return False
+def is_rtr_set(rtr_set):
+    return RTR_SET_MATCH.match(rtr_set) != None
 
 
-def check_rtr_set_validity(rtr_set):
-    if rtr_set_pattern.match(rtr_set):
-        return True
-    return False
+def is_rs_set(rs_set):
+    return RS_SET_MATCH.match(rs_set) != None
 
 
-def check_rs_set_validity(rs_set):
-    if rs_set_pattern.match(rs_set):
-        return True
-    return False
-
-
-def check_fltr_set_validity(fltr_set):
-    if filter_set_pattern.match(fltr_set):
-        return True
-    return False
+def is_fltr_set(fltr_set):
+    return FLTR_SET_MATCH.match(fltr_set) != None
 
 
 class RpslObject(object):

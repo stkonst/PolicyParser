@@ -347,7 +347,7 @@ class PolicyParser:
         #         # libtools.w([("Action: ", i.__str__) for i in pal.actionDir])
         #         return 0
         #
-        #     elif rpsl.isASN(f):
+        #     elif rpsl.is_ASN(f):
         #         # TODO rm
         #         tools.w("It is an ASN -> " + str(f))
         #         # libtools.w([("Action: ", i.__str__) for i in pal.actionDir])
@@ -359,7 +359,7 @@ class PolicyParser:
         #         # libtools.w([("Action: ", i.__str__) for i in pal.actionDir])
         #         return 0
         #
-        #     elif rpsl.check_fltr_set_validity(f):
+        #     elif rpsl.is_fltr_set(f):
         #         # TODO rm
         #         tools.w("It is an FILTER-SET -> " + str(f))
         #         # libtools.w([str(i.__str__) for i in pal.actionDir])
