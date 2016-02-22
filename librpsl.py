@@ -5,6 +5,7 @@ from xml.dom.minidom import parseString
 import communicator
 import rpsl
 import parsers
+import resolvers
 import xmlGenerator
 import libtools as tools
 
@@ -15,30 +16,25 @@ params = dict()
 
 
 def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
+
     """ PreProcess section: Get own policy, parse and create necessary Data Structures """
     com = communicator.Communicator(ripe_db_url, default_db_source)
     pp = parsers.PolicyParser(autnum, ipv4, ipv6)
 
     pp.assignContent(com.getPolicyByAutnum(autnum))
     pp.readPolicy()
+    tools.d("Found %s expressions to resolve" % pp.fltrExpressions.number_of_filters())
 
-    tools.d("Found %s filters to resolve" % pp.filters.number_of_filters())
-    """ Process section: Resolve necessary filters into prefixes
-        Use Multithreading to fetch necessary info from RIPE DB. """
-
-    # count = round(pp.filters.number_of_filters() * 0.1)
-    # last = pp.filters.number_of_filters() - (count*9)
-    # print "Per thread: %s, Last thread: %s" % (count, last)
-    ' TODO: Implement multi-threading to resolve filters'
-
-    #
-    #
-    #
+    """ Process section: Resolve necessary fltrExpressions into prefixes
+        Maybe use Multithreading to fetch necessary info from RIPE DB. """
+    ' TODO: Implement multi-threading to resolve fltrExpressions'
+    fr = resolvers.filterResolver(pp.fltrExpressions, com, ipv6)
+    fr.resolveFilters()
 
     """ PostProcess: Create and deliver the corresponding XML output """
     xmlgen = xmlGenerator.xmlGenerator(autnum, ipv4, ipv6)
     xmlgen.convertPeersToXML(pp.peerings)
-    xmlgen.convertFiltersToXML(pp.filters)
+    xmlgen.convertFiltersToXML(pp.fltrExpressions)
 
     if output == "browser":
         return xmlgen.__str__()

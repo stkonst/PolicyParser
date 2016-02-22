@@ -38,7 +38,7 @@ class PolicyParser:
         self.ipv4_enabled = ipv4
         self.ipv6_enabled = ipv6
         self.peerings = rpsl.PeerObjDir()
-        self.filters = rpsl.peerFilterDir()
+        self.fltrExpressions = rpsl.peerFilterDir()
 
     def assignContent(self, xmltext):
         try:
@@ -204,7 +204,7 @@ class PolicyParser:
 
         raise Exception("Can not parse factor: " + factor)
 
-    def parseRule(self, mytext, mp):
+    def parseRule(self, mytext, direction, mp):
         """
         Returns (afi, [(subject, filter)]). Remove all refine and except blocks
         as well as protocol and to specs.
@@ -242,33 +242,7 @@ class PolicyParser:
         # factors = _decomposeExpression(text, defaultRule)
         factors = self.decomposeExpression(mytext)
 
-        return (afi, [self.normalizeFactor(f, factors[1]) for f in factors[0]])
-
-        def extractRoutesFromSearch(self, db_object, RouteObjectDir):
-
-            # TODO, this function needs improvements
-            if self.ipv4_enabled:
-                for elem in db_object.iterfind('./objects/object[@type="route"]/primary-key'):
-                    new_prefix = None
-                    new_origin = None
-                    for subelem in elem.iterfind('./attribute[@name="route"]'):
-                        new_prefix = subelem.attrib.get("value")
-                    for subelem in elem.iterfind('./attribute[@name="origin"]'):
-                        new_origin = subelem.attrib.get("value")
-                    if new_prefix is not None or new_origin is not None:
-                        RouteObjectDir.appendRouteObj(rpsl.RouteObject(new_prefix, new_origin))
-
-            if self.ipv6_enabled:
-                for elem in db_object.iterfind('./objects/object[@type="route6"]/primary-key'):
-                    new_prefix = None
-                    new_origin = None
-                    for subelem in elem.iterfind('./attribute[@name="route6"]'):
-                        new_prefix = subelem.attrib.get("value")
-                    for subelem in elem.iterfind('./attribute[@name="origin"]'):
-                        new_origin = subelem.attrib.get("value")
-                    if new_prefix is not None and new_origin is not None:
-                        if new_prefix is not None or new_origin is not None:
-                            RouteObjectDir.appendRouteObj(rpsl.Route6Object(new_prefix, new_origin))
+        return (direction, afi, [self.normalizeFactor(f, factors[1]) for f in factors[0]])
 
     def analyser(self, mytext, rule, mp=False, ipv6=False):
         """
@@ -291,26 +265,37 @@ class PolicyParser:
         >=4 and filter analyser failed (see AutNumRule.matchFilter for details)
         """
 
-        res = self.parseRule(mytext, mp)  # return (afi, [(subject, filter)])
+        res = self.parseRule(mytext, rule, mp)  # return (direction, afi, [(subject, filter)])
         # tools.w(str(res))
 
         try:
-            peer_as = self.peerings.returnPeering(res[1][0][0])
+            peer_as = self.peerings.returnPeering(res[2][0][0])
         except Exception:
-            peer_as = rpsl.PeerAS(res[1][0][0])
-            tools.d('New peering found (%s)' % res[1][0][0])
+            peer_as = rpsl.PeerAS(res[2][0][0])
+            # tools.d('New peering found (%s)' % res[2][0][0])
             pass
 
         # Check address family matches
-        if res[0] != 'ANY' and res[0] != 'ANY.UNICAST':
-            if ((ipv6 and res[0] != 'IPV6.UNICAST') or
-                    ((not ipv6) and res[0] != 'IPV4.UNICAST')):
+        if res[1] != 'ANY' and res[1] != 'ANY.UNICAST':
+            if ((ipv6 and res[1] != 'IPV6.UNICAST') or
+                    ((not ipv6) and res[1] != 'IPV4.UNICAST')):
                 return 1
 
-        if ("ANY" or "any") != res[1][0][1]:  # Improve
-            pf = rpsl.peerFilter(str(xxhash.xxh64(res[1][0][1]).hexdigest()), str(res[1][0][1]))
-            peer_as.appendImportFilters(pf.hashValue, mp)
-            self.filters.appendFilter(pf)
+        """
+            Separation of roles. The peer class will get a pointer to the filter (hash value)
+            while the real filter will be stored temporarily for the second round of resolving.
+        """
+        # Create a hash of the filter expression
+        ha = str(xxhash.xxh64(res[2][0][1]).hexdigest())
+
+        pf = rpsl.peerFilter(ha, res[1], res[2][0][1])
+        self.fltrExpressions.appendFilter(pf)
+
+        # Append in the peer a filter set(direction, afi, hash)
+        try:
+            peer_as.appendFilter((res[0], res[1], ha), mp)
+        except:
+            tools.w("Failed to append filter %s on peer %s" % (ha, peer_as.origin))
 
         pp = rpsl.PeeringPoint(mp)
         if re.search('\sAT\s', mytext, re.I):
@@ -336,39 +321,104 @@ class PolicyParser:
         peer_as.appendPeeringPoint(pp)
         self.peerings.appentPeering(peer_as)
 
-        # Walk through factors and find whether there is subject analyser,
-        # run the filter if so
 
-        # for f in res[1][0][1].split():
-        #     # tools.d("Match? sub=", subject, 'f=', str(f))
-        #
-        #     if f == "ANY":
-        #         tools.w("WE ARE OPEN -> " + str(f))
-        #         # libtools.w([("Action: ", i.__str__) for i in pal.actionDir])
-        #         return 0
-        #
-        #     elif rpsl.is_ASN(f):
-        #         # TODO rm
-        #         tools.w("It is an ASN -> " + str(f))
-        #         # libtools.w([("Action: ", i.__str__) for i in pal.actionDir])
-        #         return 0
-        #
-        #     elif rpsl.AsSetObject(f):
-        #         # TODO rm
-        #         tools.w("It is an AS-SET -> " + str(f))
-        #         # libtools.w([("Action: ", i.__str__) for i in pal.actionDir])
-        #         return 0
-        #
-        #     elif rpsl.is_fltr_set(f):
-        #         # TODO rm
-        #         tools.w("It is an FILTER-SET -> " + str(f))
-        #         # libtools.w([str(i.__str__) for i in pal.actionDir])
-        #         return 0
-        #
-        #     else:
-        #         # raise Exception("Can not expand subject: "+str(f[0]))
-        #         tools.w("Can not expand subject:", str(f), 'in rule', mytext)
-        #         return 2
-        #
-        # # No analyser of factor for the subject means that the prefix should not appear
-        # return 3
+class ASNParser:
+    def __init__(self, ASNObject, ipv6):
+        self.ASNobj = ASNObject
+        self.ipv4 = True
+        self.ipv6 = ipv6
+
+    def extractRoutes(self, db_object):
+
+        # TODO, this function needs improvements
+        if self.ipv4:
+            for elem in db_object.iterfind('./objects/object[@type="route"]/primary-key'):
+                new_prefix = None
+                new_origin = None
+
+                for subelem in elem.iterfind('./attribute[@name="route"]'):
+                    new_prefix = subelem.attrib.get("value")
+                for subelem in elem.iterfind('./attribute[@name="origin"]'):
+                    new_origin = subelem.attrib.get("value")
+                if new_prefix is not None or new_origin is not None:
+                    self.ASNobj.routeObjDir.appendRouteObj(rpsl.RouteObject(new_prefix, new_origin))
+
+        if self.ipv6:
+            for elem in db_object.iterfind('./objects/object[@type="route6"]/primary-key'):
+                new_prefix = None
+                new_origin = None
+                for subelem in elem.iterfind('./attribute[@name="route6"]'):
+                    new_prefix = subelem.attrib.get("value")
+                for subelem in elem.iterfind('./attribute[@name="origin"]'):
+                    new_origin = subelem.attrib.get("value")
+                if new_prefix is not None and new_origin is not None:
+                    if new_prefix is not None or new_origin is not None:
+                        self.ASNobj.routeObjDir.appendRouteObj(rpsl.Route6Object(new_prefix, new_origin))
+
+
+class ASSetParser:
+    def __init__(self, AsSetObject):
+        self.setObj = AsSetObject
+
+    def parseMembers(self, db_object, old_ASNDir, old_ASSetDir):
+
+        new_ASSet = set()
+        new_ASNset = set()
+
+        for elem in db_object.iterfind('./objects/object[@type="as-set"]/attributes'):
+            for subelem in elem.iterfind('./attribute[@name="members"]'):
+                val = subelem.attrib.get("value")
+
+                if rpsl.is_ASN(val):
+                    if val not in old_ASNDir.asnObjDir.keys():
+                        new_ASNset.add(val)
+
+                elif rpsl.is_AS_set(val):
+                    if val not in old_ASSetDir.asSetObjDir.keys():
+                        new_ASSet.add(val)
+                        self.setObj.ASSetmember.add(val)
+
+        old_ASSetDir.appendAsSetObj(self.setObj)
+        return new_ASSet, new_ASNset
+
+
+class RSSetParser:
+    def __init__(self, RouteSetObject, ipv6):
+        self.setObj = RouteSetObject
+        self.ipv4_enabled = True
+        self.ipv6_enabled = ipv6
+
+    def parseMembers(self, db_object, old_RSSetDir):
+
+        new_RSSet = set()
+        # TODO, this function needs improvements
+        if self.ipv4_enabled:
+            for elem in db_object.iterfind('./objects/object[@type="route-set"]/attributes'):
+                new_member = None
+                for subelem in elem.iterfind('./attribute[@name="members"]'):
+                    new_member = subelem.attrib.get("value").strip()
+
+                    if rpsl.is_rs_set(new_member):
+                        if new_member not in old_RSSetDir.RouteSetObjDir.keys():
+                            new_RSSet.add(new_member)
+
+                    else:
+                        ro = rpsl.RouteObject(new_member, self.setObj.route_set)
+                        self.setObj.members.appendRouteObj(ro)
+
+        if self.ipv6_enabled:
+            for elem in db_object.iterfind('./objects/object[@type="route-set"]/attributes'):
+                new_member = None
+                for subelem in elem.iterfind('./attribute[@name="mp-members"]'):
+                    new_member = subelem.attrib.get("value").strip()
+
+                    if rpsl.is_rs_set(new_member):
+                        if new_member not in old_RSSetDir.RouteSetObjDir.keys():
+                            new_RSSet.add(new_member)
+
+                    else:
+                        ro = rpsl.Route6Object(new_member, "None")
+                        self.setObj.members.appendRouteObj(ro)
+
+        old_RSSetDir.appendRouteSetObj(self.setObj)
+        return new_RSSet

@@ -30,12 +30,18 @@ class Communicator:
             pass
         return db_reply
 
-    def getRoutesByAutnum(self, autnum):
+    def getRoutesByAutnum(self, autnum, ipv6_enabled=False):
+
         db_reply = None
+        if ipv6_enabled:
+            url = self.searchURLbuilder(autnum, "origin", "route", "route6", flags=None)
+        else:
+            url = self.searchURLbuilder(autnum, "origin", "route")
+
         try:
-            db_reply = self.sendDbRequest(self.searchURLbuilder(autnum, "origin", "route", "route6"))
-        except:
-            libtools.w('Get all routes failed for %s' % autnum)
+            db_reply = self.sendDbRequest(url)
+        except Exception as e:
+            libtools.w('Get all routes failed for %s. %s' % (autnum, e))
             pass
         return db_reply
 

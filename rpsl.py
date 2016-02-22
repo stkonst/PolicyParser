@@ -64,12 +64,12 @@ class RouteObject(RpslObject):
 
     ROUTE_ATTR = 'ROUTE'
     ORIGIN_ATTR = 'ORIGIN'
-    MEMBEROF_ATTR = 'MEMBER-OF'
+    # MEMBEROF_ATTR = 'MEMBER-OF'
 
     def __init__(self, route, origin):
         self.route = route
         self.origin = origin
-        self.memberof = []
+        # self.memberof = []
 
     def getKey(self):
         return self.route
@@ -108,19 +108,56 @@ class RouteObjectDir(object):
         else:
             raise Exception('Failed to insert Route object to dictionary')
 
-    def enumerateObjs(self):
-        for k in self.originTable.keys():
-            for o in self.originTable[k]:
-                yield o
+    def checkRouteExists(self, route, v6=False):
+        if v6:
+            if self.originTableV6.has_key(route):
+                return True
+            return False
+        else:
+            if self.originTable.has_key(route):
+                return True
+            return False
 
-    def enumerateObjsV6(self):
-        for k in self.originTableV6.keys():
-            for o in self.originTableV6[k]:
-                yield o
+
+class ASNObject(RpslObject):
+    """
+    Internal representation of an AS
+    """
+
+    def __init__(self, asnum):
+        self.origin = asnum
+        self.routeObjDir = RouteObjectDir()
+
+    def getKey(self):
+        return self.origin
+
+    def __str__(self):
+        return str(self.origin)
+
+    def appendRouteObj(self, RouteObject):
+        self.routeObjDir[RouteObject.getKey()] = RouteObject
+
+    def ASN_has_route(self, RouteObject, v6=False):
+        if v6:
+            if self.routeObjDir.originTableV6.has_key(RouteObject.getKey()):
+                return True
+            return False
+        else:
+            if self.routeObjDir.originTable.has_key(RouteObject.getKey()):
+                return True
+            return False
+
+
+class ASNObjectDir:
+    def __init__(self):
+        self.asnObjDir = {}
+
+    def appendASNObj(self, ASNObject):
+        self.asnObjDir[ASNObject.getKey()] = ASNObject
 
 
 class PolicyAction:
-    # TODO Create a more detailed Action Machinery (see spliter)
+    # TODO Create a more detailed Action Machinery (see george code)
     def __init__(self, i, attr, oper, val):
         self.order = i
         self.rp_attr = attr
@@ -148,77 +185,36 @@ class AsSetObject(RpslObject):
     ASSET_ATTR = 'AS-SET'
     MEMBERS_ATTR = 'MEMBERS'
 
-    @staticmethod
-    def _parseMembers(members):
-        for m in members.strip().split(','):
-            yield m.strip().upper()
-
-    @staticmethod
-    def isAsSet(name):
-        """
-        Returns True when the name appears to be as-set name (=key)
-        according to RPSL specs. """
-        return str(name).upper().find('AS-') > -1
-
-    def __init__(self, name):
+    def __init__(self, setname):
         RpslObject.__init__(self)
-        self.as_set = name
-        self.members = []
+        self.as_set = setname
+        self.ASNmembers = set()
+        self.ASSetmember = set()
 
-        # for (a, v) in RpslObject.splitLines(self.text):
-        #     if a == self.ASSET_ATTR:
-        #         self.as_set = v.strip().upper()
-        #
-        #     elif a == self.MEMBERS_ATTR:
-        #         # flatten the list in case we have this:
-        #         # members: AS123, AS456, AS-SOMETHING
-        #         # members: AS234, AS-SMTHNG
-        #         for m in AsSetObject._parseMembers(v):
-        #             self.members.append(m)
-        #
-        #     else:
-        #         pass  # ignore unrecognized lines
-        #
-        # if not self.as_set:
-        #     raise Exception("Can not create AsSetObject out of text: " + str(textlines))
+    # def appendASNMember(self, ASnumObject):
+    #     self.ASNmembers[ASnumObject.getKey()] = ASnumObject
+    #
+    # def appendASNMember(self, AsSetObject):
+    #     self.ASNmembers[AsSetObject.getKey()] = AsSetObject
 
     def getKey(self):
         return self.as_set
 
-    # def recursiveMatch(self, target, hashObjDir, recursionList=None):
-    #     """
-    #     This methods does recursion in the objects members and tries to find analyser
-    #     with the target identifier.
-    #
-    #     This is being used by filter matching instead of full filter recursion because we
-    #     know that this type of object could hold only ASNs or references to another
-    #     as-sets and therefore full filter recursion is not needed and this special
-    #     recursion offers mild speedup.
-    #     """
-    #
-    #     if recursionList == None:
-    #         recursionList = []
-    #
-    #     # common.d("AsSetObject recursiveMatch: target", target, 'in', self.getKey(), 'recursionList', recursionList)
-    #     #        common.d("Members:", self.members)
-    #     # prevent recusion loop
-    #     if self.getKey() in recursionList:
-    #         return False
-    #     recursionList.append(self.getKey())
-    #
-    #     if target in self.members:
-    #         return True
-    #
-    #     for m in self.members:
-    #         if self.isAsSet(m) and m in hashObjDir.table:
-    #             r = hashObjDir.table[m].recursiveMatch(target, hashObjDir, recursionList)
-    #             if r:
-    #                 return True
-    #
-    #     return False
-
     def __str__(self):
-        return 'AsSetObject: %s -< %s' % (self.as_set, str(self.members))
+        return 'AsSetObject: %s ' % self.as_set
+
+
+class AsSetObjectDir:
+    def __init__(self):
+        self.asSetObjDir = {}
+
+    def appendAsSetObj(self, AsSetObject):
+        self.asSetObjDir[AsSetObject.getKey()] = AsSetObject
+
+    def checkAsSetExists(self, AsSetObject):
+        if AsSetObject.getKey() in self.asSetObjDir.keys():
+            return True
+        return False
 
 
 class PeeringSetObject(RpslObject):
@@ -232,13 +228,13 @@ class PeeringSetObject(RpslObject):
     def _parsePeering(p):
         return p.strip().split(' ')[0]
 
-    @staticmethod
-    def isPeeringSet(name):
-        """
-        Returns True when the name appears to be as-set name (=key)
-        according to RPSL specs.
-        """
-        return str(name).upper().find('PRNG-') > -1
+    # @staticmethod
+    # def isPeeringSet(name):
+    #     """
+    #     Returns True when the name appears to be as-set name (=key)
+    #     according to RPSL specs.
+    #     """
+    #     return str(name).upper().find('PRNG-') > -1
 
     def __init__(self, textlines):
         RpslObject.__init__(self, textlines)
@@ -246,20 +242,20 @@ class PeeringSetObject(RpslObject):
         self.peering = []
         self.mp_peering = []
 
-        for (a, v) in RpslObject.splitLines(self.text):
-            if a == self.PEERINGSET_ATTR:
-                self.peering_set = v.strip().upper()
-
-            elif a == self.PEERING_ATTR:
-                self.peering.append(PeeringSetObject._parsePeering(v))
-
-            elif a == self.MP_PEERING_ATTR:
-                self.mp_peering.append(PeeringSetObject._parsePeering(v))
-            else:
-                pass  # ignore unrecognized lines
-
-        if not self.peering_set:
-            raise Exception("Can not create AsSetObject out of text: " + str(textlines))
+        # for (a, v) in RpslObject.splitLines(self.text):
+        #     if a == self.PEERINGSET_ATTR:
+        #         self.peering_set = v.strip().upper()
+        #
+        #     elif a == self.PEERING_ATTR:
+        #         self.peering.append(PeeringSetObject._parsePeering(v))
+        #
+        #     elif a == self.MP_PEERING_ATTR:
+        #         self.mp_peering.append(PeeringSetObject._parsePeering(v))
+        #     else:
+        #         pass  # ignore unrecognized lines
+        #
+        # if not self.peering_set:
+        #     raise Exception("Can not create AsSetObject out of text: " + str(textlines))
 
     def getKey(self):
         return self.peering_set
@@ -313,27 +309,27 @@ class FilterSetObject(RpslObject):
         self.filter = None
         self.mp_filter = None
 
-        for (a, v) in RpslObject.splitLines(self.text):
-            if a == self.FILTERSET_ATTR:
-                self.filter_set = v.strip().upper()
+        # for (a, v) in RpslObject.splitLines(self.text):
+        #     if a == self.FILTERSET_ATTR:
+        #         self.filter_set = v.strip().upper()
+        #
+        #     elif a == self.FILTER_ATTR:
+        #         self.filter = v.strip()
+        #
+        #     elif a == self.MP_FILTER_ATTR:
+        #         self.mp_filter = v.strip()
+        #
+        #     else:
+        #         pass  # ignore unrecognized lines
+        #
+        # if not self.filter_set:
+        #     raise Exception("Can not create FilterSetObject out of text: " + str(textlines))
 
-            elif a == self.FILTER_ATTR:
-                self.filter = v.strip()
-
-            elif a == self.MP_FILTER_ATTR:
-                self.mp_filter = v.strip()
-
-            else:
-                pass  # ignore unrecognized lines
-
-        if not self.filter_set:
-            raise Exception("Can not create FilterSetObject out of text: " + str(textlines))
-
-    @staticmethod
-    def isFltrSet(fltrsetid):
-        """ Returns True when the name appears to be filter-set name (=key)
-        according to RPSL specs. """
-        return fltrsetid.upper().find('FLTR-') > -1
+    # @staticmethod
+    # def isFltrSet(fltrsetid):
+    #     """ Returns True when the name appears to be filter-set name (=key)
+    #     according to RPSL specs. """
+    #     return fltrsetid.upper().find('FLTR-') > -1
 
     def getKey(self):
         return self.filter_set
@@ -358,40 +354,26 @@ class RouteSetObject(RpslObject):
     MEMBERS_ATTR = 'MEMBERS'
     MP_MEMBERS_ATTR = "MP-MEMBERS"
 
-    def __init__(self, textlines):
-        RpslObject.__init__(self, textlines)
-        self.route_set = None
-        self.members = []
-        self.mp_members = []
-
-        for (a, v) in RpslObject.splitLines(self.text):
-            if a == self.ROUTESET_ATTR:
-                self.route_set = v.strip().upper()
-
-            elif a == self.MEMBERS_ATTR:
-                self.members += [r.strip() for r in v.strip().split(',')]
-
-            elif a == self.MP_MEMBERS_ATTR:
-                self.mp_members += [r.strip() for r in v.strip().split(',')]
-
-            else:
-                pass  # ignore unrecognized lines
-
-        if not self.route_set:
-            raise Exception("Can not create RouteSetObject out of text: " + str(textlines))
-
-    @staticmethod
-    def isRouteSet(rsid):
-        """ Returs True when the name appears to be route-set name (=key)
-        according to RPSL specs. """
-        return str(rsid).find('RS-') > -1
+    def __init__(self, setname):
+        RpslObject.__init__(self)
+        self.route_set = setname
+        self.members = RouteObjectDir()
+        self.mp_members = RouteObjectDir()
+        self.RSSetsDir = {}
 
     def getKey(self):
         return self.route_set
 
     def __str__(self):
-        return 'RouteSetbject: %s -< %s + %s' % (self.route_set, str(self.members), str(self.mp_members))
+        return 'RouteSetbject: %s ' % self.route_set
 
+
+class RouteSetObjectdir:
+    def __init__(self):
+        self.RouteSetObjDir = {}
+
+    def appendRouteSetObj(self, RouteSetObject):
+        self.RouteSetObjDir[RouteSetObject.getKey()] = RouteSetObject
 
 ##################
 #   MY PART      #
@@ -399,27 +381,41 @@ class RouteSetObject(RpslObject):
 class PeerAS:
     def __init__(self, autnum):
         self.origin = autnum
-        self.v4Filters = {'imports': "", 'exports': ""}
-        self.v6Filters = {'imports': "", 'exports': ""}
+        # table scheme: {hash-value: (direction, afi)}
+        self.v4Filters = dict()
+        self.v6Filters = dict()
         self.peeringPoints = dict()
 
-    def appendImportFilters(self, filters, mp=False):
-        if filters is not None:
-            if not mp:
-                # self.v4Filters['imports'] = set(filters)
-                self.v4Filters['imports'] = filters
-            else:
-                # self.v6Filters['imports'] = set(filters)
-                self.v6Filters['imports'] = filters
+    # def appendImportFilters(self, fltrExpressions, mp=False):
+    #     if fltrExpressions is not None:
+    #         if not mp:
+    #             # self.v4Filters['imports'] = set(fltrExpressions)
+    #             self.v4Filters['imports'] = fltrExpressions
+    #         else:
+    #             # self.v6Filters['imports'] = set(fltrExpressions)
+    #             self.v6Filters['imports'] = fltrExpressions
+    #
+    # def appendExportFilters(self, fltrExpressions, mp=False):
+    #     if fltrExpressions is not None:
+    #         if not mp:
+    #             # self.v4Filters['exports'] = set(fltrExpressions)
+    #             self.v4Filters['exports'] = fltrExpressions
+    #         else:
+    #             # self.v6Filters['exports'] = set(fltrExpressions)
+    #             self.v6Filters['exports'] = fltrExpressions
 
-    def appendExportFilters(self, filters, mp=False):
-        if filters is not None:
-            if not mp:
-                # self.v4Filters['exports'] = set(filters)
-                self.v4Filters['exports'] = filters
+    def appendFilter(self, info, mp):
+
+        # info set(direction, afi, hash)
+        if 'IPV4' in info[1]:
+            self.v4Filters[info[2]] = (info[0], info[1])
+        elif 'IPV6' in info[1]:
+            self.v6Filters[info[2]] = (info[0], info[1])
             else:
-                # self.v6Filters['exports'] = set(filters)
-                self.v6Filters['exports'] = filters
+                if mp:
+                    self.v6Filters[info[2]] = (info[0], info[1])
+                else:
+                    raise Exception("Unsupported AFI found")
 
     def appendPeeringPoint(self, PeeringPoint):
         self.peeringPoints[PeeringPoint.getKey()] = PeeringPoint
@@ -431,26 +427,6 @@ class PeerAS:
         if pkey in self.peeringPoints:
             return True
         return False
-
-    def getAllFilters(self):
-
-        filter_set = set()
-        # if self.ipv4:
-        filter_set.update(self.v4Filters.get('imports'))
-        filter_set.update(self.v4Filters.get('exports'))
-        # if self.ipv6:
-        filter_set.update(self.v6Filters.get('imports'))
-        filter_set.update(self.v6Filters.get('exports'))
-
-        return filter_set
-
-        # def __str__(self):
-        #     if not self.ipv6:
-        #         return "Peering %s with remote %s at local %s " % (self.origin, self.remoteIPv4, self.localIPv4)
-        #     else:
-        #         return "Peering %s with remote (%s ~ %s) at local (%s ~ %s) " % (
-        #         self.origin, self.remoteIPv4, self.remoteIPv6,
-        #         self.localIPv4, self.localIPv6)
 
 
 class PeeringPoint:
@@ -498,18 +474,20 @@ class PeerObjDir:
 
 class peerFilter:
     """
-    We define 4 types of resolved (or not resolved) filters:
-    0: No type has been assigned, therefore the filter has not been resolved and shall be rejected.
+    We define 4 types of resolved (or not resolved) fltrExpressions:
+    0: Unresolved (could not be expanded) filter, therefore it shall be rejected or decided by the user.
     1: Prefix_List (the filter is resolved in a complete prefix list and can be transferred into the router)
-    2: AS_Path (The filter is an AS path expression and needs to be copied into the router accordingly)
-    3: REGEX (The filter is a Regular Expression and needs to be transferred in the router correctly)
-    4: COMBI (The filter is a combination of the other types)
+    2: CP The filter is an expression and needs to be copied into the router accordingly
+    3: COMBI (The filter is a combination of the other types)
     """
 
-    def __init__(self, hv, expr):
+    def __init__(self, hv, afi, expr):
         self.hashValue = hv
         self.expression = expr
+        self.afi = afi
         self.type = 0
+        # self.prefix_list = {}
+        # self.cp = {}
 
     def __str__(self):
         yield str(self.hashValue) + " -> " + self.expression
