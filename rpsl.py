@@ -56,6 +56,15 @@ def is_fltr_set(value):
     return FLTR_SET_MATCH.match(value) != None
 
 
+def is_as_path_member(value):
+    valid = False
+    for regex in AS_PATH_MEMBER_MATCH:
+        if regex.match(value):
+            valid = True
+            break
+    return valid
+
+
 class RpslObject(object):
     """ Thanks to Tomas """
 
@@ -427,11 +436,11 @@ class PeerAS:
             self.v4Filters[info[2]] = (info[0], info[1])
         elif 'IPV6' in info[1]:
             self.v6Filters[info[2]] = (info[0], info[1])
+        else:
+            if mp:
+                self.v6Filters[info[2]] = (info[0], info[1])
             else:
-                if mp:
-                    self.v6Filters[info[2]] = (info[0], info[1])
-                else:
-                    raise Exception("Unsupported AFI found")
+                raise Exception("Unsupported AFI found")
 
     def appendPeeringPoint(self, PeeringPoint):
         self.peeringPoints[PeeringPoint.getKey()] = PeeringPoint

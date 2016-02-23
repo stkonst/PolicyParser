@@ -1,7 +1,6 @@
 import rpsl
 import errors
 
-import sys
 import re
 from collections import namedtuple
 
@@ -157,13 +156,7 @@ def _get_tokens(filter_text, ASes, AS_sets):
             pushed_term = True
 
         elif inside_ASPATH:
-            valid = False
-            for regex in rpsl.AS_PATH_MEMBER_MATCH:
-                if regex.match(token):
-                    valid = True
-                    break
-
-            if not valid:
+            if not rpsl.is_as_path_member(token):
                 raise errors.FilterAnalysisError(
                         "'{}' is not a valid member of AS-PATH!".format(token))
 
