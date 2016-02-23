@@ -2,42 +2,58 @@ __author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl) '
 __author__ += 'Tomas Hlavacek (tmshlvck@gmail.com) '
 import re
 
+#  TODO Recheck all regex later for fine tuning.
 ASN_MATCH = re.compile('^AS[0-9]+$')
-PFX_FLTR_MATCH = re.compile('^\{([^}]*)\}(\^[0-9\+-]+)?$')
-PFX_FLTR_PARSE = re.compile('^([0-9A-F:\.]+/[0-9]+)(\^[0-9\+-]+)?$')
-REGEXP_FLTR_PARSE = re.compile('^<([^>]+)>$')
-AS_SET_MATCH = re.compile('^(AS\d+:)*AS-(\w|-)*$', re.I)
-RS_SET_MATCH = re.compile('^RS-(\w|-)*$', re.I)
-RTR_SET_MATCH = re.compile('^RTR-(\w|-)*$', re.I)
-FLTR_SET_MATCH = re.compile('^FLTR-(\w|-)*$', re.I)
+PFX_FLTR_MATCH = re.compile('^\{([^}]*)\}(\^[0-9+-]+)?$')
+PFX_MATCH = re.compile('^([0-9A-F:\.]+/[0-9]+)(\^[0-9+-]+)?$')
+PFX_RANGE_OPERATOR = re.compile('^\^[0-9+-]+$')
+AS_SET_MATCH = re.compile('^(AS\d+:)*AS-(\w|-)+$')
+RS_SET_MATCH = re.compile('^RS-(\w|-)+$')
+RTR_SET_MATCH = re.compile('^RTR-(\w|-)+$')
+FLTR_SET_MATCH = re.compile('^FLTR-(\w|-)+$')
+
+# Regex operators
+# {m} {m,} {m,n}    --> ~?\{\d+(?:,\d*)?\}
+# OR
+# * + ? ~ ~* ~+     --> (?:\?|~?(?:\*|\+)?)
+regex_ops = '(?:(?:\?|~?(?:\*|\+)?)|~?\{\d+(?:,\d*)?\})?'
+AS_PATH_MEMBER_MATCH = [ # ASN with regex operators
+                        re.compile("^\^?{asn}{regexops}\$?$".format(asn='AS[0-9]+',regexops=regex_ops)),
+                        # AS_SET with regex operators
+                        re.compile("^\^?{as_set}{regexops}\$?$".format(as_set='(AS\d+:)*AS-(\w|-)*',regexops=regex_ops)),
+                        # '.' with regex operators
+                        re.compile("^\^?\.{regexops}\$?$".format(regexops=regex_ops)),]
+
+def is_ASN(value):
+    return ASN_MATCH.match(str(value).strip()) != None
 
 
-def is_ASN(asn):
-    return ASN_MATCH.match(str(asn).strip()) != None
+def is_pfx_filter(value):
+    return PFX_FLTR_MATCH.match(value) != None
 
 
-def is_pfx_filter(fltr):
-    return PFX_FLTR_MATCH.match(fltr) != None
+def is_pfx(value):
+    return PFX_MATCH.match(value) != None
 
 
-def is_pfx(pfx):
-    return PFX_FLTR_PARSE.match(pfx) != None
+def is_pfx_range_operator(value):
+    return PFX_RANGE_OPERATOR.match(value) != None
 
 
-def is_AS_set(as_set):
-    return AS_SET_MATCH.match(as_set) != None
+def is_AS_set(value):
+    return AS_SET_MATCH.match(value) != None
 
 
-def is_rtr_set(rtr_set):
-    return RTR_SET_MATCH.match(rtr_set) != None
+def is_rtr_set(value):
+    return RTR_SET_MATCH.match(value) != None
 
 
-def is_rs_set(rs_set):
-    return RS_SET_MATCH.match(rs_set) != None
+def is_rs_set(value):
+    return RS_SET_MATCH.match(value) != None
 
 
-def is_fltr_set(fltr_set):
-    return FLTR_SET_MATCH.match(fltr_set) != None
+def is_fltr_set(value):
+    return FLTR_SET_MATCH.match(value) != None
 
 
 class RpslObject(object):
