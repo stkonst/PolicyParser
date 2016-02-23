@@ -123,7 +123,6 @@ class ASNObject(RpslObject):
     """
     Internal representation of an AS
     """
-
     def __init__(self, asnum):
         self.origin = asnum
         self.routeObjDir = RouteObjectDir()
@@ -149,6 +148,7 @@ class ASNObject(RpslObject):
 
 
 class ASNObjectDir:
+
     def __init__(self):
         self.asnObjDir = {}
 

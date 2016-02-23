@@ -75,7 +75,7 @@ class Communicator:
             headers = {'Accept': 'application/xml'}
             r = requests.get(db_url, headers=headers)
             if r.status_code == 200:
-                return r.text
+                return r.text.encode(encoding='utf-8')
             elif r.status_code == 400:
                 raise Exception("Illegal input - incorrect value in one or more of the parameters")
             elif r.status_code == 404:
