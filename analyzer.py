@@ -6,10 +6,10 @@ from collections import namedtuple
 
 TEST_STRING_1 = "(AS1 OR AS2) AND <AS1+ AS2*>"
 TEST_STRING_2 = "(AS1 OR AS2) AND <AS1+ AS2*> AND <AS99{3,}> AND (AS-3 OR AS-4) AND NOT {192.168.1.0/24, 10.0.0.0/1}dfasdf AND {192.168.1.0/24^-}^26-28"
-TEST_STRING_3 = "(AS1 AS2) AND AS3 AS4"
+TEST_STRING_3 = "(AS1 AS2) AND AS3 AS4 RS-12"
 TEST_STRING_4 = "(AS1 AS2) AS3 AS4 AND <AS-PATHffnsakdlfa fasdf> {asdf fasdf}"
 TEST_STRING_5 = "<^AS1 + ? ~ * ~+ ~? ~* {3,3} AS-set AS* .* .+ .? AS1+ AS1? AS1* AS1{3,3} AS1{3,} AS1{3} AS-set{3,} AS-set* AS-set$>"
-TEST_STRING = TEST_STRING_2
+TEST_STRING = TEST_STRING_3
 
 GROUP_START = "("
 GROUP_END = ")"
@@ -18,7 +18,8 @@ ASPATH_END = ">"
 PREFIX_START = "{"
 PREFIX_END = "}"
 
-AS, AS_SET, AS_PATH, PREFIX_LIST, UNIMPLEMENTED = 'AS AS_set AS_path prefix_list uniplemented'.split()
+AS, AS_SET, AS_PATH, PREFIX_LIST, RS_SET, UNIMPLEMENTED = (
+'AS AS_set  AS_PATH  prefix_list  rs_set  uniplemented'.split())
 
 op_details = namedtuple('op_details', 'precedence associativity')
 
@@ -118,7 +119,7 @@ def _explode_filter(filter_text):
     return filter_text
 
 
-def _get_tokens(filter_text, ASes, AS_sets):
+def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
     """Constructs a list of identified tokens to be used by the Shunting-Yard
     algorithm.
 
@@ -225,6 +226,11 @@ def _get_tokens(filter_text, ASes, AS_sets):
                 AS_sets.add(token)
                 pushed_term = True
 
+            elif rpsl.is_rs_set(token):
+                identified_tokens.append((RS_SET, token))
+                RS_sets.add(token)
+                pushed_term = True
+
             else:
                 identified_tokens.append((UNIMPLEMENTED, token))
                 pushed_term = True
@@ -307,17 +313,19 @@ def analyze_filter(filter_text):
         filter_text (str): The filter expression.
 
     Returns:
-        (list, set, set): The result of the Shunting-Yard algorithm as a list (LIFO queue),
+        (list, set, set, set): The result of the Shunting-Yard algorithm as a list (LIFO queue),
                           The set of ASes seen,
-                          The set of AS_sets seen.
+                          The set of AS_sets seen,
+                          The set of RS_sets seen.
     Raises:
         FilterAnalysisError
     """
     ASes = set()
     AS_sets = set()
-    tokens = _get_tokens(filter_text, ASes, AS_sets)
+    RS_sets = set()
+    tokens = _get_tokens(filter_text, ASes, AS_sets, RS_sets)
     output_queue = _shunting_yard(tokens)
-    return output_queue, ASes, AS_sets
+    return output_queue, ASes, AS_sets, RS_sets
 
 
 def compose_filters(output_queue):
@@ -325,8 +333,9 @@ def compose_filters(output_queue):
 
 
 if __name__ == "__main__":
-    out, ases, assets = analyze_filter(TEST_STRING)
+    out, ases, assets, rssets = analyze_filter(TEST_STRING)
     #print "out: {}".format([ desc if desc in ops else value for desc, value in out])
     print "out: {}".format([ desc for desc, value in out])
     print "ases: {}".format(ases)
     print "assets: {}".format(assets)
+    print "rssets: {}".format(rssets)
