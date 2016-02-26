@@ -1,10 +1,11 @@
 __author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl) '
 __author__ += 'George Thessalonikefs (george@nlnetlabs.nl) '
+import logging
 import xml.etree.ElementTree as et
 
 import rpsl
+import analyzer
 import parsers
-import libtools as tools
 
 depth_limit = 15
 
@@ -20,11 +21,25 @@ class filterResolver:
 
     def resolveFilters(self):
 
-        for pf in self.peerFilters.filterTable.itervalues():
+        for pf in self.peerFilters.enumerateObjs():
             'TODO: Maybe a try-except will help better'
-            self.recogniseFilter(pf)
+            pf.queue, new_ASNs, new_asSets, new_rsSets = analyzer.analyze_filter(pf.expression)
 
-    def resolveASN(self, asn):
+            for a in new_ASNs:
+                obj = self._resolveASN(a)
+                if obj is not None:
+                    # Possibility to get a garbage AS-num is quite high
+                    self.ASNdir.appendASNObj(obj)
+
+            for s in new_asSets:
+                self._resolveASSet(s, -1)
+
+            for r in new_rsSets:
+                self._resolveRSSet(r, -1)
+
+                # self._doOperations()
+
+    def _resolveASN(self, asn):
 
         try:
             ans = self.communicator.getRoutesByAutnum(asn, ipv6_enabled=True)
@@ -38,111 +53,72 @@ class filterResolver:
             return asnObj
 
         except LookupError:
-            tools.w("No Object found for %s " % asn)
+            logging.error("No Object found for %s " % asn)
             return None
 
         except Exception as e:
-            tools.w("Failed to resolve DB object %s. %s " % (asn, e))
+            logging.warning("Failed to resolve DB object %s. %s " % (asn, e))
             return None
 
-    def resolveASSet(self, setname, depth):
+    def _resolveASSet(self, setname, depth):
 
-        loop = True
         if depth == depth_limit:
-            tools.w("Emergency exit. Too much recursion.")
+            logging.warning("Emergency exit. Too much recursion.")
             return
         depth += 1
 
-        while loop:
-            try:
-                ans = self.communicator.getFilterSet("as-set", setname)
-                if ans is None:
-                    raise LookupError
+        try:
+            ans = self.communicator.getFilterSet(setname)
+            if ans is None:
+                raise LookupError
 
-                dbObj = et.fromstring(ans)
-                setObj = rpsl.AsSetObject(setname)
-                aspa = parsers.ASSetParser(setObj)
+            dbObj = et.fromstring(ans)
+            setObj = rpsl.AsSetObject(setname)
+            aspa = parsers.ASSetParser(setObj)
 
-                """ First variable refers to AS-SETs that are included and need to be resolved (recursively).
-                    Second variable refers to ASNs that are included and need to be resolved.
-                """
-                unresolved, new_ASNset = aspa.parseMembers(dbObj, self.ASNdir, self.asSetdir)
-                s = '"'
-                for i in range(0, depth):
-                    s += "-"
-                tools.d("%s>Found %s ASNs and %s AS-SETs in %s" % (s, len(new_ASNset), len(unresolved), setname))
+            """ First variable refers to AS-SETs that are included and need to be resolved (recursively).
+                Second variable refers to ASNs that are included and need to be resolved.
+            """
+            new_ASsets, new_ASNs = aspa.parseMembers(dbObj, self.ASNdir, self.asSetdir)
+            s = '"'
+            for i in range(0, depth):
+                s += "-"
+            logging.debug(
+                "%s>Found %s new ASNs and %s new AS-SETs in %s" % (s, len(new_ASNs), len(new_ASsets), setname))
 
-                for a in new_ASNset:
-                    if a not in self.ASNdir.asnObjDir.keys():
-                        o = self.resolveASN(a)
-                    if o is not None:
-                        self.ASNdir.appendASNObj(o)
+            for a in new_ASNs:
+                o = self._resolveASN(a)
+                if o is not None:
+                    self.ASNdir.appendASNObj(o)
 
-                if len(unresolved) is 0:
-                    # Break recursion if no other AS-SETs are included
-                    loop = False
-                else:
-                    for u in unresolved:
-                        self.resolveASSet(u, depth)
+            for u in new_ASsets:
+                self._resolveASSet(u, depth)
 
-            except LookupError:
-                tools.w("No Object found for %s " % setname)
-                break
+        except LookupError:
+            logging.error("No Object found for %s " % setname)
+            return
 
-            except Exception as e:
-                tools.w("Failed to resolve DB object %s. %s " % (setname, e))
-                break
+        except Exception as e:
+            logging.warning("Failed to resolve DB object %s. %s " % (setname, e))
+            return
 
-    def resolveRSSet(self, rsname):
+    def _resolveRSSet(self, rsname, depth):
 
-        loop = True
-        while loop:
-            try:
-                dbObj = et.fromstring(self.communicator.getFilterSet("route-set", rsname))
-                setObj = rpsl.RouteSetObject(rsname)
-                rspa = parsers.RSSetParser(setObj, self.ipv6_enabled)
-                unresolved = rspa.parseMembers(dbObj, self.RSSetDir)
-                if len(unresolved) is 0:
-                    loop = False
-                else:
-                    for u in unresolved:
-                        self.resolveRSSet(u)
+        depth += 1
+        try:
+            dbObj = et.fromstring(self.communicator.getFilterSet(rsname))
+            setObj = rpsl.RouteSetObject(rsname)
+            rspa = parsers.RSSetParser(setObj, self.ipv6_enabled)
 
-            except Exception as e:
-                tools.w("Failed to fully resolve -> %s. %s" % (rsname, e))
-                break
+            new_rsSets = rspa.parseMembers(dbObj, self.RSSetDir)
+            for u in new_rsSets:
+                self._resolveRSSet(u, depth)
 
-    def recogniseFilter(self, pf):
-        for f in pf.expression.split():
+        except Exception as e:
+            logging.error("Failed to fully resolve -> %s. %s" % (rsname, e))
+            return
 
-            if f == "ANY":
-                tools.d("WE ARE OPEN -> " + str(f))
-                return 0
+    def _doOperations(self):
 
-            elif rpsl.is_ASN(f):
-                tools.d("It is an ASN -> " + str(f))
-                obj = self.resolveASN(f)
-                if obj is not None:
-                    # Possibility to get a garbage AS-num is quite high
-                    self.ASNdir.appendASNObj(obj)
-                return 0
-
-            elif rpsl.is_AS_set(f):
-                tools.d("It is an AS-SET -> " + str(f))
-                # if f == "AS-OTENET":
-                #     pass
-                self.resolveASSet(f, -1)
-                return 0
-
-            elif rpsl.is_rs_set(f):
-                tools.d("It is an RS-SET -> " + str(f))
-                self.resolveRSSet(f)
-                return 0
-
-            elif rpsl.is_fltr_set(f):
-                tools.d("It is an FILTER-SET -> " + str(f))
-                return 0
-
-            else:
-                tools.w("Can not expand subject:", str(f), 'in rule', f)
-                return 2  # No analyser of factor for the subject means that the prefix should not appear
+        for pf in self.peerFilters.enumerateObjs():
+            analyzer.compose_filters(pf.queue)

@@ -1,32 +1,42 @@
 __author__ = 'stavros'
-import requests
+import logging
 
-import libtools
+import requests
 
 
 class Communicator:
-    def __init__(self, db_url, source):
+    def __init__(self, db_url, source, alternatives):
+
+        def _getAlternatives(alternatives):
+            s = ""
+            for i in alternatives:
+                s += "&source=%s" % i
+
+            return s
+
         self.db_url = db_url
         self.source = source
+        self.other_sources = _getAlternatives(alternatives)
+        self.session = requests.session()
 
     def getPolicyByAutnum(self, autnum):
         db_reply = None
         try:
-            db_reply = self.sendDbRequest(self.locatorURLbuilder("aut-num", autnum))
-            libtools.d("Policy received for %s" % autnum)
+            db_reply = self._sendDbRequest(self._searchURLbuilder(autnum, None, None))
+            logging.debug("Policy received for %s" % autnum)
         except:
-            libtools.w("Failed to receive policy for %s" % autnum)
+            logging.error("Failed to receive policy for %s" % autnum)
             pass
 
         return db_reply
 
-    def getFilterSet(self, ftype, value):
+    def getFilterSet(self, value):
         # Can make requests for as-set, route-set
         db_reply = None
         try:
-            db_reply = self.sendDbRequest(self.locatorURLbuilder(ftype, value))
+            db_reply = self._sendDbRequest(self._searchURLbuilder(value, None, None))
         except:
-            libtools.w('Get Filter failed for %s' % value)
+            logging.error('Get Filter failed for %s' % value)
             pass
         return db_reply
 
@@ -34,29 +44,26 @@ class Communicator:
 
         db_reply = None
         if ipv6_enabled:
-            url = self.searchURLbuilder(autnum, "origin", "route", "route6", flags=None)
+            url = self._searchURLbuilder(autnum, "origin", "route", "route6", flags=None)
         else:
-            url = self.searchURLbuilder(autnum, "origin", "route")
+            url = self._searchURLbuilder(autnum, "origin", "route")
 
         try:
-            db_reply = self.sendDbRequest(url)
+            db_reply = self._sendDbRequest(url)
         except Exception as e:
-            libtools.w('Get all routes failed for %s. %s' % (autnum, e))
+            logging.error('Get all routes failed for %s. %s' % (autnum, e))
             pass
         return db_reply
 
-    def locatorURLbuilder(self, db_type, db_key):
-        """
-        Example url: http://rest.db.ripe.net/ripe/aut-num/AS199664
-        """
-        return self.db_url + "/%s/%s/%s" % (self.source, db_type, db_key)
-
-    def searchURLbuilder(self, query_string, inverse_attribute, type_filter1, type_filter2=None, flags=None):
+    def _searchURLbuilder(self, query_string, inverse_attribute, type_filter1, type_filter2=None, flags=None):
         """
         Example:
             http://rest.db.ripe.net/search.xml?query-string=as199664&type-filter=route6&inverse-attribute=origin
         """
-        new_url = "/search.xml?query-string=%s" % query_string
+
+        new_url = "/search.xml?query-string=%s&source=%s" % (query_string, self.source)
+        new_url += self.other_sources
+
         if inverse_attribute is not None:
             new_url += "&inverse-attribute=%s" % inverse_attribute
         if type_filter1 is not None:
@@ -68,17 +75,19 @@ class Communicator:
 
         return self.db_url + new_url
 
-    def sendDbRequest(self, db_url):
+    def _sendDbRequest(self, db_url):
 
         try:
             # headers = {'Content-Type': 'application/json'}
             headers = {'Accept': 'application/xml'}
-            r = requests.get(db_url, headers=headers)
+            r = self.session.get(db_url, headers=headers)
             if r.status_code == 200:
                 return r.text.encode(encoding='utf-8')
             elif r.status_code == 400:
+                logging.warning("Illegal input - incorrect value in one or more of the parameters")
                 raise Exception("Illegal input - incorrect value in one or more of the parameters")
             elif r.status_code == 404:
+                logging.warning("No Objects found")
                 raise Exception("No Objects found")
         except:
             # dunno, we got another type of Error

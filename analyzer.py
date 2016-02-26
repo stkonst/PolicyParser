@@ -1,8 +1,9 @@
-import rpsl
-import errors
-
+__author__ = 'George Thessalonikefs (george@nlnetlabs.nl) '
 import re
 from collections import namedtuple
+
+import rpsl
+import errors
 
 TEST_STRING_1 = "(AS1 OR AS2) AND <AS1+ AS2*>"
 TEST_STRING_2 = "(AS1 OR AS2) AND <AS1+ AS2*> AND <AS99{3,}> AND (AS-3 OR AS-4) AND NOT {192.168.1.0/24, 10.0.0.0/1}dfasdf AND {192.168.1.0/24^-}^26-28"
@@ -19,7 +20,7 @@ PREFIX_START = "{"
 PREFIX_END = "}"
 
 AS, AS_SET, AS_PATH, PREFIX_LIST, RS_SET, UNIMPLEMENTED = (
-'AS AS_set  AS_PATH  prefix_list  rs_set  uniplemented'.split())
+    'AS AS_set  AS_PATH  prefix_list  rs_set  uniplemented'.split())
 
 op_details = namedtuple('op_details', 'precedence associativity')
 
@@ -27,7 +28,7 @@ ops = {
     'NOT': op_details(precedence=3, associativity='Right'),
     'AND': op_details(precedence=2, associativity='Left'),
     'OR': op_details(precedence=1, associativity='Left'),
-    }
+}
 
 
 def _explode_filter(filter_text):
@@ -48,10 +49,10 @@ def _explode_filter(filter_text):
     Returns: 
         (str): The exploded filter expression.
     """
-    filter_text = filter_text.replace(GROUP_START,  ' ' + GROUP_START  + ' ')
-    filter_text = filter_text.replace(GROUP_END,    ' ' + GROUP_END    + ' ')
+    filter_text = filter_text.replace(GROUP_START, ' ' + GROUP_START + ' ')
+    filter_text = filter_text.replace(GROUP_END, ' ' + GROUP_END + ' ')
     filter_text = filter_text.replace(ASPATH_START, ' ' + ASPATH_START + ' ')
-    filter_text = filter_text.replace(ASPATH_END,   ' ' + ASPATH_END   + ' ')
+    filter_text = filter_text.replace(ASPATH_END, ' ' + ASPATH_END + ' ')
 
     # Below is the procedure to differentiate prefix lists from regex range
     # operators and explode the former.
@@ -72,27 +73,27 @@ def _explode_filter(filter_text):
             continue
 
         if char == PREFIX_START:
-            #print "Found character: {}".format(filter_text)
-            #print "                 {}{}".format(' '*(i), '^')
+            # print "Found character: {}".format(filter_text)
+            # print "                 {}{}".format(' '*(i), '^')
             range_end = filter_text.find(PREFIX_END, i)
             if range_end == -1:
                 raise errors.FilterAnalysisError("Non matching curly brackets!")
 
             # If the enclosing value is not a regex range operator explode the
             # left curly bracket.
-            if not re.search("^\d+(?:,\d*)?$", filter_text[i+1:range_end]):
-                filter_text = filter_text[:i] + ' ' + char + ' ' + filter_text[i+1:]
+            if not re.search("^\d+(?:,\d*)?$", filter_text[i + 1:range_end]):
+                filter_text = filter_text[:i] + ' ' + char + ' ' + filter_text[i + 1:]
                 adj += 2
 
-            #print "Result:          {}".format(filter_text)
-            #print
+                # print "Result:          {}".format(filter_text)
+                # print
 
         # The right curly brackets are only cases of prefix lists. The closing
         # curly brackets of regex range operators are ignored based on the
         # range_end character skipping above.
         elif char == PREFIX_END:
-            #print "Found character: {}".format(filter_text)
-            #print "                 {}{}".format(' '*(i), '^')
+            # print "Found character: {}".format(filter_text)
+            # print "                 {}{}".format(' '*(i), '^')
             # We make the assumption that the end of the prefix list (with or
             # without an outer range operator) is separated by space from the
             # next element.
@@ -100,21 +101,21 @@ def _explode_filter(filter_text):
 
             # If we reached the end of the filter.
             if range_end == -1:
-                trail = filter_text[i+1:]
+                trail = filter_text[i + 1:]
             else:
-                trail = filter_text[i+1:range_end]
+                trail = filter_text[i + 1:range_end]
 
             # If the thing that is stuck onto the PREFIX_END is not a range
             # operator, make some distance.
             if not rpsl.is_pfx_range_operator(trail):
-                filter_text = filter_text[:i] + ' ' + char + ' ' + filter_text[i+1:]
+                filter_text = filter_text[:i] + ' ' + char + ' ' + filter_text[i + 1:]
                 adj += 2
             else:
                 filter_text = filter_text[:i] + ' ' + filter_text[i:]
                 adj += 1
 
-            #print "Result:          {}".format(filter_text)
-            #print
+                # print "Result:          {}".format(filter_text)
+                # print
 
     return filter_text
 
@@ -159,7 +160,7 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
         elif inside_ASPATH:
             if not rpsl.is_as_path_member(token):
                 raise errors.FilterAnalysisError(
-                        "'{}' is not a valid member of AS-PATH!".format(token))
+                    "'{}' is not a valid member of AS-PATH!".format(token))
 
             identified_tokens[-1][1].append(token)
             pushed_term = False
@@ -329,13 +330,31 @@ def analyze_filter(filter_text):
 
 
 def compose_filters(output_queue):
-    pass
+    print output_queue
+    print "\n\n"
+    index = len(output_queue) - 1
+    while index >= 0:
+        # print output_queue[index]
+        if output_queue[index][0] is "OR":
+            print "need to add sets"
+
+        elif output_queue[index][0] is "AND":
+            print "need to intersect sets"
+
+        elif output_queue[index][0] is "NOT":
+            print "need to exclude one set"
+
+        index -= 1
+        # pass
 
 
 if __name__ == "__main__":
     out, ases, assets, rssets = analyze_filter(TEST_STRING)
-    #print "out: {}".format([ desc if desc in ops else value for desc, value in out])
-    print "out: {}".format([ desc for desc, value in out])
-    print "ases: {}".format(ases)
-    print "assets: {}".format(assets)
-    print "rssets: {}".format(rssets)
+    # print "out: {}".format([ desc if desc in ops else value for desc, value in out])
+    compose_filters(out)
+    # print "\n \n"
+    # print "out: {}".format([desc for desc, value in out])
+    # print "ases: {}".format(ases)
+    # print "assets: {}".format(assets)
+    # print "rssets: {}".format(rssets)
+    compose_filters(out)

@@ -1,5 +1,6 @@
 __author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl)'
 __author__ += 'Tomas Hlavacek (tmshlvck@gmail.com)'
+import logging
 import xml.etree.ElementTree as et
 import re
 import xxhash
@@ -43,12 +44,12 @@ class PolicyParser:
     def assignContent(self, xmltext):
         try:
             self.etContent = et.fromstring(xmltext)
-        except:
+        except et.ParseError:
             raise Exception('Failed to load DB content in XML format')
 
     def readPolicy(self):
 
-        tools.d('Will parse policy for %s' % self.autnum)
+        logging.debug('Will parse policy for %s' % self.autnum)
         for elem in self.etContent.iterfind('./objects/object[@type="aut-num"]/attributes/attribute'):
 
             line_parsed = False
@@ -56,34 +57,34 @@ class PolicyParser:
 
                 if "import" == elem.attrib.get("name"):
                     try:
-                        self.analyser(elem.attrib.get("value").upper(), mp=False, rule="import")
+                        self.interpreter(elem.attrib.get("value").upper(), mp=False, rule="import")
                         line_parsed = True
                     except:
-                        tools.w("Failed to parse import {%s}" % elem.attrib.get("value"))
+                        logging.warning("Failed to parse import {%s}" % elem.attrib.get("value"))
                         pass
 
                 elif "export" == elem.attrib.get("name"):
                     try:
-                        self.analyser(elem.attrib.get("value").upper(), mp=False, rule="export")
+                        self.interpreter(elem.attrib.get("value").upper(), mp=False, rule="export")
                         line_parsed = True
                     except:
-                        tools.w("Failed to parse export {%s}" % elem.attrib.get("value"))
+                        logging.warning("Failed to parse export {%s}" % elem.attrib.get("value"))
                         pass
 
             if not line_parsed and self.ipv6_enabled:
 
                 if "mp-import" == elem.attrib.get("name"):
                     try:
-                        self.analyser(elem.attrib.get("value").upper(), mp=True, rule="import")
+                        self.interpreter(elem.attrib.get("value").upper(), mp=True, rule="import")
                     except:
-                        tools.w("Failed to parse import {%s}" % elem.attrib.get("value"))
+                        logging.warning("Failed to parse import {%s}" % elem.attrib.get("value"))
                         pass
 
                 elif "mp-export" == elem.attrib.get("name"):
                     try:
-                        self.analyser(elem.attrib.get("value").upper(), mp=True, rule="export")
+                        self.interpreter(elem.attrib.get("value").upper(), mp=True, rule="export")
                     except:
-                        tools.w("Failed to parse export {%s}" % elem.attrib.get("value"))
+                        logging.warning("Failed to parse export {%s}" % elem.attrib.get("value"))
                         pass
 
     def extractIPs(self, policy_object, PeeringPoint, mp=False):
@@ -244,7 +245,7 @@ class PolicyParser:
 
         return (direction, afi, [self.normalizeFactor(f, factors[1]) for f in factors[0]])
 
-    def analyser(self, mytext, rule, mp=False, ipv6=False):
+    def interpreter(self, mytext, rule, mp=False, ipv6=False):
         """
         Analyse and interpret the rule.
 
@@ -256,13 +257,6 @@ class PolicyParser:
         fltrsetDirectory = HashObjectDir that conains the FilterSetObjects
         rtsetDirectory = HashObjectDir that conains the RouteSetObjects
         ipv6 = matching IPv6 route?
-
-        returns:
-        0 when analyser is OK
-        1 when AFI does not analyser
-        2 when subject can not be expanded (= not ASN nor AS-SET)
-        3 when not analyser for the subject has been found in factors
-        >=4 and filter analyser failed (see AutNumRule.matchFilter for details)
         """
 
         res = self.parseRule(mytext, rule, mp)  # return (direction, afi, [(subject, filter)])
@@ -272,7 +266,7 @@ class PolicyParser:
             peer_as = self.peerings.returnPeering(res[2][0][0])
         except Exception:
             peer_as = rpsl.PeerAS(res[2][0][0])
-            # tools.d('New peering found (%s)' % res[2][0][0])
+            # logging.debug('New peering found (%s)' % res[2][0][0])
             pass
 
         # Check address family matches
@@ -295,11 +289,11 @@ class PolicyParser:
         try:
             peer_as.appendFilter((res[0], res[1], ha), mp)
         except:
-            tools.w("Failed to append filter %s on peer %s" % (ha, peer_as.origin))
+            logging.warning("Failed to append filter %s on peer %s" % (ha, peer_as.origin))
 
         pp = rpsl.PeeringPoint(mp)
         if re.search('\sAT\s', mytext, re.I):
-            """ === WARNING ===
+            """ === warning ===
                 In case of peering on multiple network edges,
                 more peering-IPs are present in the policy!!!
             """
@@ -370,13 +364,19 @@ class ASSetParser:
                 val = subelem.attrib.get("value")
 
                 if rpsl.is_ASN(val):
-                    if val not in old_ASNDir.asnObjDir.keys():
+                    self.setObj.ASNmembers.add(val)
+                    try:
+                        old_ASNDir.asnObjDir[val]
+                    except KeyError:
                         new_ASNset.add(val)
+                        pass
 
                 elif rpsl.is_AS_set(val):
-                    if val not in old_ASSetDir.asSetObjDir.keys():
+                    self.setObj.ASSetmember.add(val)
+                    try:
+                        old_ASSetDir.asSetObjDir[val]
+                    except KeyError:
                         new_ASSet.add(val)
-                        self.setObj.ASSetmember.add(val)
 
         old_ASSetDir.appendAsSetObj(self.setObj)
         return new_ASSet, new_ASNset
@@ -394,7 +394,7 @@ class RSSetParser:
         # TODO, this function needs improvements
         if self.ipv4_enabled:
             for elem in db_object.iterfind('./objects/object[@type="route-set"]/attributes'):
-                new_member = None
+                # new_member = None
                 for subelem in elem.iterfind('./attribute[@name="members"]'):
                     new_member = subelem.attrib.get("value").strip()
 
@@ -408,7 +408,7 @@ class RSSetParser:
 
         if self.ipv6_enabled:
             for elem in db_object.iterfind('./objects/object[@type="route-set"]/attributes'):
-                new_member = None
+                # new_member = None
                 for subelem in elem.iterfind('./attribute[@name="mp-members"]'):
                     new_member = subelem.attrib.get("value").strip()
 
@@ -422,4 +422,3 @@ class RSSetParser:
 
         old_RSSetDir.appendRouteSetObj(self.setObj)
         return new_RSSet
-

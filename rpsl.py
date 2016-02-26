@@ -24,6 +24,7 @@ AS_PATH_MEMBER_MATCH = [ # ASN with regex operators
                         # '.' with regex operators
                         re.compile("^\^?\.{regexops}\$?$".format(regexops=regex_ops)),]
 
+
 def is_ASN(value):
     return ASN_MATCH.match(str(value).strip()) != None
 
@@ -216,12 +217,6 @@ class AsSetObject(RpslObject):
         self.ASNmembers = set()
         self.ASSetmember = set()
 
-    # def appendASNMember(self, ASnumObject):
-    #     self.ASNmembers[ASnumObject.getKey()] = ASnumObject
-    #
-    # def appendASNMember(self, AsSetObject):
-    #     self.ASNmembers[AsSetObject.getKey()] = AsSetObject
-
     def getKey(self):
         return self.as_set
 
@@ -288,7 +283,7 @@ class PeeringSetObject(RpslObject):
     # def recursiveMatch(self, target, hashObjDir, recursionList=None):
     #     """
     #     This methods does recusion in the objects peering and mp-peering sections
-    #     and tries to find analyser with the target identifier.
+    #     and tries to find interpreter with the target identifier.
     #
     #     This is being used by filter matching instead of full filter recursion because we
     #     know that this type of object could hold only ASNs or references to another
@@ -401,8 +396,9 @@ class RouteSetObjectdir:
         self.RouteSetObjDir[RouteSetObject.getKey()] = RouteSetObject
 
 ##################
-#   MY PART      #
 ##################
+
+
 class PeerAS:
     def __init__(self, autnum):
         self.origin = autnum
@@ -410,24 +406,6 @@ class PeerAS:
         self.v4Filters = dict()
         self.v6Filters = dict()
         self.peeringPoints = dict()
-
-    # def appendImportFilters(self, fltrExpressions, mp=False):
-    #     if fltrExpressions is not None:
-    #         if not mp:
-    #             # self.v4Filters['imports'] = set(fltrExpressions)
-    #             self.v4Filters['imports'] = fltrExpressions
-    #         else:
-    #             # self.v6Filters['imports'] = set(fltrExpressions)
-    #             self.v6Filters['imports'] = fltrExpressions
-    #
-    # def appendExportFilters(self, fltrExpressions, mp=False):
-    #     if fltrExpressions is not None:
-    #         if not mp:
-    #             # self.v4Filters['exports'] = set(fltrExpressions)
-    #             self.v4Filters['exports'] = fltrExpressions
-    #         else:
-    #             # self.v6Filters['exports'] = set(fltrExpressions)
-    #             self.v6Filters['exports'] = fltrExpressions
 
     def appendFilter(self, info, mp):
 
@@ -475,7 +453,7 @@ class PeeringPoint:
         return str(self.local_ip) + "|" + str(self.remote_ip)
 
     def __str__(self):
-        yield "Local_IP: %s Remote_IP: %s" % (self.local_ip, self.remote_ip)
+        return "Local_IP: %s Remote_IP: %s" % (self.local_ip, self.remote_ip)
 
 
 class PeerObjDir:
@@ -493,8 +471,7 @@ class PeerObjDir:
 
     def enumerateObjs(self):
         for k in self.peerTable.keys():
-            for o in self.peerTable[k]:
-                yield o
+            yield self.peerTable[k]
 
 
 class peerFilter:
@@ -509,13 +486,12 @@ class peerFilter:
     def __init__(self, hv, afi, expr):
         self.hashValue = hv
         self.expression = expr
+        self.queue = ""
         self.afi = afi
         self.type = 0
-        # self.prefix_list = {}
-        # self.cp = {}
 
     def __str__(self):
-        yield str(self.hashValue) + " -> " + self.expression
+        return str(self.hashValue) + " -> " + self.expression
 
 
 class peerFilterDir:
@@ -530,3 +506,7 @@ class peerFilterDir:
 
     def number_of_filters(self):
         return len(self.filterTable.keys())
+
+    def enumerateObjs(self):
+        for k in self.filterTable.keys():
+            yield self.filterTable[k]
