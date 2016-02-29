@@ -132,6 +132,7 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
         filter_text (str): The filter expression.
         ASes (set): The set to update with AS values.
         AS_sets (set): The set to update with AS_set values.
+        RS_sets (set): The set to update with RS_set values.
 
     Returns:
         (list): The identified tokens.
