@@ -252,7 +252,7 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
                 pushed_term = True
 
             else:
-                raise error.UnimplementedError("Element '{}' is not implemented!".format(token))
+                raise errors.UnimplementedError("Element '{}' is not implemented!".format(token))
 
     if inside_ASPATH:
         raise errors.FilterAnalysisError("AS-PATH is not closed!")
