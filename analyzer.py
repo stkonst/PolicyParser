@@ -10,7 +10,8 @@ TEST_STRING_2 = "(AS1 OR AS2) AND <AS1+ AS2*> AND <AS99{3,}> AND (AS-3 OR AS-4) 
 TEST_STRING_3 = "(AS1 AS2) AND AS3 AS4 RS-12"
 TEST_STRING_4 = "(AS1 AS2) AS3 AS4 AND <AS-PATHffnsakdlfa fasdf> {asdf fasdf}"
 TEST_STRING_5 = "<^AS1 + ? ~ * ~+ ~? ~* {3,3} AS-set AS* .* .+ .? AS1+ AS1? AS1* AS1{3,3} AS1{3,} AS1{3} AS-set{3,} AS-set* AS-set$>"
-TEST_STRING = TEST_STRING_3
+TEST_STRING_6 = "(AS1 OR AS2)  AND (AS3 OR AS4)"
+TEST_STRING = TEST_STRING_6
 
 GROUP_START = "("
 GROUP_END = ")"
@@ -19,8 +20,8 @@ ASPATH_END = ">"
 PREFIX_START = "{"
 PREFIX_END = "}"
 
-AS, AS_SET, AS_PATH, PREFIX_LIST, RS_SET, UNIMPLEMENTED = (
-    'AS AS_set  AS_PATH  prefix_list  rs_set  uniplemented'.split())
+AS, AS_SET, AS_PATH, PREFIX_LIST, RS_SET = (
+    'AS AS_set  AS_path  prefix_list  rs_set'.split())
 
 op_details = namedtuple('op_details', 'precedence associativity')
 
@@ -43,11 +44,19 @@ def _explode_filter(filter_text):
     distinguish prefix list's contents from regex range operators as they are
     both surrounded by curly brackets.
 
-    Args:
-        filter_text (str): The filter expression.
+    Parameters
+    ----------
+    filter_text : str
+        The filter expression.
 
-    Returns: 
-        (str): The exploded filter expression.
+    Returns
+    -------
+    filter_text : str
+        The exploded filter expression.
+
+    Raises
+    ------
+    FilterAnalysisError
     """
     filter_text = filter_text.replace(GROUP_START, ' ' + GROUP_START + ' ')
     filter_text = filter_text.replace(GROUP_END, ' ' + GROUP_END + ' ')
@@ -128,17 +137,26 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
         - Inserts 'OR' where it is ommited to ease calculation later.
         - Updates the given sets with seen values.
 
-    Args:
-        filter_text (str): The filter expression.
-        ASes (set): The set to update with AS values.
-        AS_sets (set): The set to update with AS_set values.
-        RS_sets (set): The set to update with RS_set values.
+    Parameters
+    ----------
+    filter_text : str
+        The filter expression.
+    ASes : set
+        The set to update with AS values.
+    AS_sets : set
+        The set to update with AS_set values.
+    RS_sets : set
+        The set to update with RS_set values.
 
-    Returns:
-        (list): The identified tokens.
+    Returns
+    -------
+    identified_tokens : list
+        The identified tokens.
 
-    Raises:
-        FilterAnalysisError
+    Raises
+    ------
+    FilterAnalysisError
+    UnimplementedError
     """
     inside_ASPATH = False
     inside_PREFIX = False
@@ -234,8 +252,7 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
                 pushed_term = True
 
             else:
-                identified_tokens.append((UNIMPLEMENTED, token))
-                pushed_term = True
+                raise error.UnimplementedError("Element '{}' is not implemented!".format(token))
 
     if inside_ASPATH:
         raise errors.FilterAnalysisError("AS-PATH is not closed!")
@@ -250,14 +267,19 @@ def _shunting_yard(tokens):
     The algorithm is tuned to parse the filter elements of RPSL instead of
     mathematical expressions.
 
-    Args:
-        tokens (list): Previously identified tokens of the filter expression.
+    Parameters
+    ----------
+    tokens : list
+        Previously identified tokens of the filter expression.
 
-    Returns:
-        (list): The algorithm's output queue (LIFO).
+    Returns
+    -------
+    output_queue : list
+        The algorithm's output queue (LIFO).
 
-    Raises:
-        FilterAnalysisError
+    Raises
+    ------
+    FilterAnalysisError
     """
     output_queue = []
     operator_stack = []
@@ -311,16 +333,26 @@ def analyze_filter(filter_text):
     """Analyzes the filter and runs the Shunting-Yard algorithm to produce a LIFO
     queue that can be used for evaluation.
 
-    Args:
-        filter_text (str): The filter expression.
+    Parameters
+    ----------
+    filter_text : str
+        The filter expression.
 
-    Returns:
-        (list, set, set, set): The result of the Shunting-Yard algorithm as a list (LIFO queue),
-                          The set of ASes seen,
-                          The set of AS_sets seen,
-                          The set of RS_sets seen.
-    Raises:
-        FilterAnalysisError
+    Returns
+    -------
+    output_queue : list
+        The result of the Shunting-Yard algorithm as a list (LIFO queue).
+    Ases : set
+        The set of ASes seen.
+    AS_sets : set
+        The set of AS_sets seen.
+    RS_sets : set
+        The set of RS_sets seen.
+
+    Raises
+    ------
+    FilterAnalysisError
+    UnimplementedError
     """
     ASes = set()
     AS_sets = set()
@@ -351,11 +383,11 @@ def compose_filters(output_queue):
 
 if __name__ == "__main__":
     out, ases, assets, rssets = analyze_filter(TEST_STRING)
-    # print "out: {}".format([ desc if desc in ops else value for desc, value in out])
-    compose_filters(out)
+    print "out: {}".format([ desc if desc in ops else value for desc, value in out])
+    # compose_filters(out)
     # print "\n \n"
     # print "out: {}".format([desc for desc, value in out])
     # print "ases: {}".format(ases)
     # print "assets: {}".format(assets)
     # print "rssets: {}".format(rssets)
-    compose_filters(out)
+    # compose_filters(out)
