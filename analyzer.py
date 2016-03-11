@@ -5,13 +5,6 @@ from collections import namedtuple
 import rpsl
 import errors
 
-TEST_STRING_1 = "(AS1 OR AS2) AND <AS1+ AS2*>"
-TEST_STRING_2 = "(AS1 OR AS2) AND <AS1+ AS2*> AND <AS99{3,}> AND (AS-3 OR AS-4) AND NOT {192.168.1.0/24, 10.0.0.0/1}dfasdf AND {192.168.1.0/24^-}^26-28"
-TEST_STRING_3 = "(AS1 AS2) AND AS3 AS4 RS-12"
-TEST_STRING_4 = "(AS1 AS2) AS3 AS4 AND <AS-PATHffnsakdlfa fasdf> {asdf fasdf}"
-TEST_STRING_5 = "<^AS1 + ? ~ * ~+ ~? ~* {3,3} AS-set AS* .* .+ .? AS1+ AS1? AS1* AS1{3,3} AS1{3,} AS1{3} AS-set{3,} AS-set* AS-set$>"
-TEST_STRING = TEST_STRING_3
-
 GROUP_START = "("
 GROUP_END = ")"
 ASPATH_START = "<"
@@ -187,7 +180,7 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
             identified_tokens[-1][1].append(token)
             pushed_term = False
 
-        elif token in ops:
+        elif token in ['AND', 'OR']:
             identified_tokens.append((token, ops[token]))
             pushed_term = False
 
@@ -199,7 +192,11 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
             if pushed_term:
                 identified_tokens.append(('OR', ops['OR']))
 
-            if token == GROUP_START:
+            if token == 'NOT':
+                identified_tokens.append((token, ops[token]))
+                pushed_term = False
+
+            elif token == GROUP_START:
                 identified_tokens.append((token, op_details(precedence=0, associativity='Left')))
                 pushed_term = False
 
@@ -329,26 +326,39 @@ def analyze_filter(filter_text):
     return output_queue, ASes, AS_sets, RS_sets
 
 
-def compose_filters(output_queue):
-    print output_queue
-    print "\n\n"
-    index = len(output_queue) - 1
-    while index >= 0:
-        # print output_queue[index]
-        if output_queue[index][0] is "OR":
-            print "need to add sets"
+def compose_filter(output_queue):
+    """Composes the required filter structure from the Shunting-Yard algorithm output.
 
-        elif output_queue[index][0] is "AND":
-            print "need to intersect sets"
+    Parameters
+    ----------
+    output_queue : list
+        The Shunting-Yard output for a given filter.
 
-        elif output_queue[index][0] is "NOT":
-            print "need to exclude one set"
+    Returns
+    -------
+    result : list
+        A list containing Terms in order.
 
-        index -= 1
-        # pass
+    Raises
+    ------
+    FilterCompositionError
+        When the input queue is invalid.
+    UnimplementedError
+        When the code reaches unimplemented functionality.
+    """
+    import temp_operations_with_terms
+    return temp_operations_with_terms.compose_filter(output_queue)
 
 
 if __name__ == "__main__":
+    TEST_STRING_1 = "(AS1 OR AS2) AND <AS1+ AS2*>"
+    TEST_STRING_2 = "(AS1 OR AS2) AND <AS1+ AS2*> AND <AS99{3,}> AND (AS-3 OR AS-4) AND NOT {192.168.1.0/24, 10.0.0.0/1}dfasdf AND {192.168.1.0/24^-}^26-28"
+    TEST_STRING_3 = "(AS1 AS2) AND AS3 AS4 RS-12"
+    TEST_STRING_4 = "(AS1 AS2) AS3 AS4 AND <AS-PATHffnsakdlfa fasdf> {asdf fasdf}"
+    TEST_STRING_5 = "<^AS1 + ? ~ * ~+ ~? ~* {3,3} AS-set AS* .* .+ .? AS1+ AS1? AS1* AS1{3,3} AS1{3,} AS1{3} AS-set{3,} AS-set* AS-set$>"
+    TEST_STRING_6 = "(AS1 OR AS2)  AND (AS3 OR AS4)"
+    TEST_STRING = TEST_STRING_6
+
     out, ases, assets, rssets = analyze_filter(TEST_STRING)
     # print "out: {}".format([ desc if desc in ops else value for desc, value in out])
     compose_filters(out)
