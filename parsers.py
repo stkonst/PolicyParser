@@ -418,7 +418,7 @@ class RSSetParser:
 
                     else:
                         ro = rpsl.Route6Object(new_member, "None")
-                        self.setObj.members.appendRouteObj(ro)
+                        self.setObj.mp_members.appendRouteObj(ro)
 
         old_RSSetDir.appendRouteSetObj(self.setObj)
         return new_RSSet

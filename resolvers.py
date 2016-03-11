@@ -2,6 +2,7 @@ __author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl) '
 __author__ += 'George Thessalonikefs (george@nlnetlabs.nl) '
 import logging
 import xml.etree.ElementTree as et
+import xxhash
 
 import rpsl
 import analyzer
@@ -16,7 +17,8 @@ class filterResolver:
         self.ipv6_enabled = ipv6_enabled
         self.communicator = Communicator
         self.RSSetDir = rpsl.RouteSetObjectdir()
-        self.ASNdir = rpsl.ASNObjectDir()
+        self.ASNList = set()
+        self.dataPool = rpsl.ASNObjectDir()
         self.asSetdir = rpsl.AsSetObjectDir()
 
     def resolveFilters(self):
@@ -26,10 +28,11 @@ class filterResolver:
             pf.queue, new_ASNs, new_asSets, new_rsSets = analyzer.analyze_filter(pf.expression)
 
             for a in new_ASNs:
+                self.ASNList.add(a)
                 obj = self._resolveASN(a)
                 if obj is not None:
                     # Possibility to get a garbage AS-num is quite high
-                    self.ASNdir.appendASNObj(obj)
+                    self.dataPool.appendASNObj(obj)
 
             for s in new_asSets:
                 self._resolveASSet(s, -1)
@@ -47,7 +50,7 @@ class filterResolver:
                 raise LookupError
 
             dbObj = et.fromstring(ans)
-            asnObj = rpsl.ASNObject(asn)
+            asnObj = rpsl.ASNObject(asn, str(xxhash.xxh64(asn).hexdigest()))
             ap = parsers.ASNParser(asnObj, True)
             ap.extractRoutes(dbObj)
             return asnObj
@@ -73,13 +76,13 @@ class filterResolver:
                 raise LookupError
 
             dbObj = et.fromstring(ans)
-            setObj = rpsl.AsSetObject(setname)
+            setObj = rpsl.AsSetObject(setname, str(xxhash.xxh64(setname).hexdigest()))
             aspa = parsers.ASSetParser(setObj)
 
             """ First variable refers to AS-SETs that are included and need to be resolved (recursively).
                 Second variable refers to ASNs that are included and need to be resolved.
             """
-            new_ASsets, new_ASNs = aspa.parseMembers(dbObj, self.ASNdir, self.asSetdir)
+            new_ASsets, new_ASNs = aspa.parseMembers(dbObj, self.dataPool, self.asSetdir)
             s = '"'
             for i in range(0, depth):
                 s += "-"
@@ -89,7 +92,7 @@ class filterResolver:
             for a in new_ASNs:
                 o = self._resolveASN(a)
                 if o is not None:
-                    self.ASNdir.appendASNObj(o)
+                    self.dataPool.appendASNObj(o)
 
             for u in new_ASsets:
                 self._resolveASSet(u, depth)
@@ -107,7 +110,7 @@ class filterResolver:
         depth += 1
         try:
             dbObj = et.fromstring(self.communicator.getFilterSet(rsname))
-            setObj = rpsl.RouteSetObject(rsname)
+            setObj = rpsl.RouteSetObject(rsname, str(xxhash.xxh64(rsname).hexdigest()))
             rspa = parsers.RSSetParser(setObj, self.ipv6_enabled)
 
             new_rsSets = rspa.parseMembers(dbObj, self.RSSetDir)
@@ -118,7 +121,7 @@ class filterResolver:
             logging.error("Failed to fully resolve -> %s. %s" % (rsname, e))
             return
 
-    def _doOperations(self):
-
-        for pf in self.peerFilters.enumerateObjs():
-            analyzer.compose_filters(pf.queue)
+            # def _doOperations(self):
+            #
+            #     for pf in self.peerFilters.enumerateObjs():
+            #         analyzer.compose_filters(pf.queue)

@@ -52,6 +52,8 @@ class xmlGenerator:
         template_root.append(et.Comment('This is a resolved XML policy file for ' + autnum))
         template_root.append(et.Comment('Datetime of creation ( %s )' % datetime.datetime.now()))
 
+        et.SubElement(template_root, 'prefix-lists')
+
         et.SubElement(template_root, 'peering-filters')
 
         et.SubElement(template_root, 'peering-policy')
@@ -63,18 +65,47 @@ class xmlGenerator:
         fltr_root = et.Element('peering-filter',
                                attrib={"type": str(peerFilter.type), "hash-value": peerFilter.hashValue})
         et.SubElement(fltr_root, "expression").text = peerFilter.expression
-        ac = et.SubElement(fltr_root, "rules", attrib={"type": "accept"})
-        re = et.SubElement(fltr_root, "rules", attrib={"type": "reject"})
+        # ac = et.SubElement(fltr_root, "rules", attrib={"type": "accept"})
+        # re = et.SubElement(fltr_root, "rules", attrib={"type": "reject"})
 
-        et.SubElement(ac, "prefix-list")
-        et.SubElement(ac, "communities")
-        et.SubElement(ac, "as-path")
-
-        et.SubElement(re, "prefix-list")
-        et.SubElement(re, "communities")
-        et.SubElement(re, "as-path")
+        # et.SubElement(ac, "prefix-list")
+        # et.SubElement(ac, "communities")
+        # et.SubElement(ac, "as-path")
+        #
+        # et.SubElement(re, "prefix-list")
+        # et.SubElement(re, "communities")
+        # et.SubElement(re, "as-path")
+        st = et.SubElement(fltr_root, "statements")
 
         return fltr_root
+
+    def _AStoXML(self, ASNObject, pl):
+
+        for r in ASNObject.routeObjDir.originTable.itervalues():
+            et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+
+        for r in ASNObject.routeObjDir.originTableV6.itervalues():
+            et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+
+    def _RouteSetToXML(self, RouteSetObject, lists_root):
+        pl = et.SubElement(lists_root, 'prefix-list', attrib={'name': RouteSetObject.getKey(),
+                                                              'hash-value': RouteSetObject.hash})
+        for r in RouteSetObject.members.originTable.itervalues():
+            et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+
+        for r in RouteSetObject.mp_members.originTableV6.itervalues():
+            et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+
+    def _ASSETtoXML(self, AsSetObject, ASNObjectDir, AsSetObjectDir, pl_root):
+
+        for m in AsSetObject.ASNmembers:
+            try:
+                self._AStoXML(ASNObjectDir.asnObjDir[m], pl_root)
+            except KeyError:
+                pass
+
+        for t in AsSetObject.ASSetmember:
+            self._ASSETtoXML(AsSetObjectDir.asSetObjDir[t], ASNObjectDir, AsSetObjectDir, pl_root)
 
     def _peeringPointToXML(self, points_root, PeeringPoint):
 
@@ -132,6 +163,25 @@ class xmlGenerator:
     def convertPeersToXML(self, PeerObjDir):
         for p, val in PeerObjDir.peerTable.iteritems():
             self.xml_policy.find('peering-policy').append(self.peerToXML(val))
+
+    def convertListsToXML(self, ASNList, ASNObjectDir, RouteSetObjectdir, AsSetObjectDir):
+
+        p = self.xml_policy.find('prefix-lists')
+        for s in AsSetObjectDir.asSetObjDir.itervalues():
+            pl = et.SubElement(p, 'prefix-list', attrib={'name': s.getKey(), 'hash-value': s.hash})
+            self._ASSETtoXML(s, ASNObjectDir, AsSetObjectDir, pl)
+
+        for v in ASNList:
+            try:
+                obj = ASNObjectDir.asnObjDir[v]
+                pl = et.SubElement(p, 'prefix-list', attrib={'name': obj.origin, 'hash-value': obj.hash})
+                self._AStoXML(obj, pl)
+
+            except KeyError:
+                pass
+
+        for v in RouteSetObjectdir.RouteSetObjDir.itervalues():
+            self._RouteSetToXML(v, p)
 
     def __str__(self):
         return et.tostring(self.xml_policy, encoding='UTF-8')

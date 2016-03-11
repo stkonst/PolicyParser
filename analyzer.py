@@ -5,12 +5,14 @@ from collections import namedtuple
 import rpsl
 import errors
 
-TEST_STRING_1 = "(AS1 OR AS2) AND <AS1+ AS2*>"
-TEST_STRING_2 = "(AS1 OR AS2) AND <AS1+ AS2*> AND <AS99{3,}> AND (AS-3 OR AS-4) AND NOT {192.168.1.0/24, 10.0.0.0/1}dfasdf AND {192.168.1.0/24^-}^26-28"
-TEST_STRING_3 = "(AS1 AS2) AND AS3 AS4 RS-12"
-TEST_STRING_4 = "(AS1 AS2) AS3 AS4 AND <AS-PATHffnsakdlfa fasdf> {asdf fasdf}"
-TEST_STRING_5 = "<^AS1 + ? ~ * ~+ ~? ~* {3,3} AS-set AS* .* .+ .? AS1+ AS1? AS1* AS1{3,3} AS1{3,} AS1{3} AS-set{3,} AS-set* AS-set$>"
-TEST_STRING = TEST_STRING_3
+
+
+# TEST_STRING_1 = "(AS1 OR AS2) AND <AS1+ AS2*>"
+# TEST_STRING_2 = "(AS1 OR AS2) AND <AS1+ AS2*> AND <AS99{3,}> AND (AS-3 OR AS-4) AND NOT {192.168.1.0/24, 10.0.0.0/1}dfasdf AND {192.168.1.0/24^-}^26-28"
+# TEST_STRING_3 = "(AS1 AS2) AND AS3 AS4 RS-12"
+# TEST_STRING_4 = "(AS1 AS2) AS3 AS4 AND <AS-PATHffnsakdlfa fasdf> {asdf fasdf}"
+# TEST_STRING_5 = "<^AS1 + ? ~ * ~+ ~? ~* {3,3} AS-set AS* .* .+ .? AS1+ AS1? AS1* AS1{3,3} AS1{3,} AS1{3} AS-set{3,} AS-set* AS-set$>"
+# TEST_STRING = TEST_STRING_3
 
 GROUP_START = "("
 GROUP_END = ")"
@@ -347,14 +349,14 @@ def compose_filters(output_queue):
         index -= 1
         # pass
 
-
-if __name__ == "__main__":
-    out, ases, assets, rssets = analyze_filter(TEST_STRING)
-    # print "out: {}".format([ desc if desc in ops else value for desc, value in out])
-    compose_filters(out)
-    # print "\n \n"
-    # print "out: {}".format([desc for desc, value in out])
-    # print "ases: {}".format(ases)
-    # print "assets: {}".format(assets)
-    # print "rssets: {}".format(rssets)
-    compose_filters(out)
+#
+# if __name__ == "__main__":
+#     out, ases, assets, rssets = analyze_filter(TEST_STRING)
+#     # print "out: {}".format([ desc if desc in ops else value for desc, value in out])
+#     compose_filters(out)
+#     # print "\n \n"
+#     # print "out: {}".format([desc for desc, value in out])
+#     # print "ases: {}".format(ases)
+#     # print "assets: {}".format(assets)
+#     # print "rssets: {}".format(rssets)
+#     compose_filters(out)

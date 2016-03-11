@@ -149,8 +149,10 @@ class ASNObject(RpslObject):
     """
     Internal representation of an AS
     """
-    def __init__(self, asnum):
+
+    def __init__(self, asnum, hv):
         self.origin = asnum
+        self.hash = hv
         self.routeObjDir = RouteObjectDir()
 
     def getKey(self):
@@ -211,9 +213,10 @@ class AsSetObject(RpslObject):
     ASSET_ATTR = 'AS-SET'
     MEMBERS_ATTR = 'MEMBERS'
 
-    def __init__(self, setname):
+    def __init__(self, setname, hv):
         RpslObject.__init__(self)
         self.as_set = setname
+        self.hash = hv
         self.ASNmembers = set()
         self.ASSetmember = set()
 
@@ -374,9 +377,10 @@ class RouteSetObject(RpslObject):
     MEMBERS_ATTR = 'MEMBERS'
     MP_MEMBERS_ATTR = "MP-MEMBERS"
 
-    def __init__(self, setname):
+    def __init__(self, setname, hv):
         RpslObject.__init__(self)
         self.route_set = setname
+        self.hash = hv
         self.members = RouteObjectDir()
         self.mp_members = RouteObjectDir()
         self.RSSetsDir = {}
