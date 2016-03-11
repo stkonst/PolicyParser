@@ -35,8 +35,8 @@ class Communicator:
         db_reply = None
         try:
             db_reply = self._sendDbRequest(self._searchURLbuilder(value, None, None))
-        except:
-            logging.error('Get Filter failed for %s' % value)
+        except Exception as e:
+            logging.error('Get Filter failed for %s. %s ' % (value, e))
             pass
         return db_reply
 
@@ -84,11 +84,23 @@ class Communicator:
             if r.status_code == 200:
                 return r.text.encode(encoding='utf-8')
             elif r.status_code == 400:
-                logging.warning("Illegal input - incorrect value in one or more of the parameters")
-                raise Exception("Illegal input - incorrect value in one or more of the parameters")
+                logging.warning("RIPE-API: The service is unable to understand and process the request.")
+                raise Exception("RIPE-API_ERROR_400")
+            elif r.status_code == 403:
+                logging.warning("RIPE-API: Query limit exceeded.")
+                raise Exception("RIPE-API_ERROR_403")
             elif r.status_code == 404:
-                logging.warning("No Objects found")
-                raise Exception("No Objects found")
+                logging.warning("RIPE-API: No Objects found")
+                raise Exception("RIPE-API_ERROR_404")
+            elif r.status_code == 409:
+                logging.warning("RIPE-API: Integrity constraint violated")
+                raise Exception("RIPE-API_ERROR_409")
+            elif r.status_code == 500:
+                logging.warning("RIPE-API: Internal Server Error")
+                raise Exception("RIPE-API_ERROR_500")
+            else:
+                logging.warning("Unknown RIPE API response")
+                raise Exception("RIPE-API_ERROR_UNKNOWN")
         except:
             # dunno, we got another type of Error
             raise
