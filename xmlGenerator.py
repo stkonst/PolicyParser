@@ -65,17 +65,7 @@ class xmlGenerator:
         fltr_root = et.Element('peering-filter',
                                attrib={"type": str(peerFilter.type), "hash-value": peerFilter.hashValue})
         et.SubElement(fltr_root, "expression").text = peerFilter.expression
-        # ac = et.SubElement(fltr_root, "rules", attrib={"type": "accept"})
-        # re = et.SubElement(fltr_root, "rules", attrib={"type": "reject"})
-
-        # et.SubElement(ac, "prefix-list")
-        # et.SubElement(ac, "communities")
-        # et.SubElement(ac, "as-path")
-        #
-        # et.SubElement(re, "prefix-list")
-        # et.SubElement(re, "communities")
-        # et.SubElement(re, "as-path")
-        st = et.SubElement(fltr_root, "statements")
+        et.SubElement(fltr_root, "statements")
 
         return fltr_root
 

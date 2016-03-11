@@ -34,7 +34,9 @@ def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
 
     """ PostProcess: Create and deliver the corresponding XML output """
     com.session.close()
+
     xmlgen = xmlGenerator.xmlGenerator(autnum, ipv4, ipv6)
+
     xmlgen.convertPeersToXML(pp.peerings)
     xmlgen.convertFiltersToXML(pp.fltrExpressions)
     xmlgen.convertListsToXML(fr.ASNList, fr.dataPool, fr.RSSetDir, fr.asSetdir)
