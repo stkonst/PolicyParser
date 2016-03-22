@@ -469,11 +469,16 @@ def compose_filter(output_queue):
         raise errors.FilterCompositionError("Provided empty queue as input!")
 
     node = output_queue.pop()
-    if node[0] not in ops:
+    if output_queue and node[0] not in ops:
         raise errors.FilterCompositionError("Invalid queue. The queue's tail must be an operator!")
 
     result, _ = execute_node(node, output_queue)
-    return result
+    if result[0] == 'OPERAND':
+        term = Term(result[1].allow)
+        term.members = [result[1]]
+        return [term]
+    else:
+        return result[1]
 
 
 if __name__ == "__main__":
@@ -502,13 +507,14 @@ if __name__ == "__main__":
     TEST_STRING_20 = "AS1 OR (AS2 AND AS3) OR NOT AS6 OR (AS4 AND AS5)"
     TEST_STRING_21 = "AS1 OR (AS2 AND (AS3 OR AS4)) OR NOT AS5 OR (AS6 AND AS7)"
     TEST_STRING_22 = "AS1 AND (AS2 OR (AS3 AND AS4)) AND NOT AS5 AND (AS6 OR AS7)"
+    TEST_STRING_23 = "NOT AS1 AS2 AS3"
 
     TEST_STRINGS = [TEST_STRING_1, TEST_STRING_2, TEST_STRING_3, TEST_STRING_4,
                     TEST_STRING_5, TEST_STRING_6, TEST_STRING_7, TEST_STRING_8,
                     TEST_STRING_9, TEST_STRING_10, TEST_STRING_11, TEST_STRING_12,
                     TEST_STRING_13, TEST_STRING_14, TEST_STRING_15, TEST_STRING_16,
                     TEST_STRING_17, TEST_STRING_18, TEST_STRING_19, TEST_STRING_20,
-                    TEST_STRING_21, TEST_STRING_22]
+                    TEST_STRING_21, TEST_STRING_22, TEST_STRING_23]
 
     for i, TEST_STRING in enumerate(TEST_STRINGS):
         try:
@@ -529,7 +535,7 @@ if __name__ == "__main__":
             # print
             print "Terms"
             print "-----"
-            for term in result[1]:
+            for term in result:
                 print "Allow: {}".format(term.allow)
                 print "Members: {}".format([m.data for m in term.members])
                 print
