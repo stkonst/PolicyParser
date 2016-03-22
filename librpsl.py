@@ -26,8 +26,11 @@ def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
     pp.readPolicy()
     logging.debug("Found %s expressions to resolve" % pp.fltrExpressions.number_of_filters())
 
-    """ Process section: Resolve necessary fltrExpressions into prefixes
-        Maybe use Multithreading to fetch necessary info from RIPE DB. """
+    """
+        Process section: Resolve necessary fltrExpressions into prefixes
+        Maybe use Multithreading to fetch necessary info from RIPE DB.
+    """
+
     ' TODO: Implement multi-threading to resolve fltrExpressions'
     fr = resolvers.filterResolver(pp.fltrExpressions, com, ipv6)
     fr.resolveFilters()
@@ -74,11 +77,7 @@ else:
         if arg == "-6":
             params["ipv6"] = "True"
 
-        if arg == "-r":
-            # for resolving AS-SETS, RS-SETS, FLTR-SETS etc
-            params["resolve"] = "True"
-
-print("Configuration done. Initialising...")
+print("Configuration done. Starting...")
 
 if starting_flag:
     logging.getLogger("requests").setLevel(logging.WARNING)

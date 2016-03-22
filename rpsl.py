@@ -479,20 +479,12 @@ class PeerObjDir:
 
 
 class peerFilter:
-    """
-    We define 4 types of resolved (or not resolved) fltrExpressions:
-    0: Unresolved (could not be expanded) filter, therefore it shall be rejected or decided by the user.
-    1: Prefix_List (the filter is resolved in a complete prefix list and can be transferred into the router)
-    2: CP The filter is an expression and needs to be copied into the router accordingly
-    3: COMBI (The filter is a combination of the other types)
-    """
 
     def __init__(self, hv, afi, expr):
         self.hashValue = hv
         self.expression = expr
-        self.queue = ""
+        self.statements = ""
         self.afi = afi
-        self.type = 0
 
     def __str__(self):
         return str(self.hashValue) + " -> " + self.expression

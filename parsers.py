@@ -23,9 +23,9 @@ PARSE_RANGE = re.compile('^\^([0-9]+)-([0-9]+)$')
 AFI_MATCH_HACK = re.compile('^AFI\s+(IPV6.UNICAST)(FROM.*)$')
 ################# END OF HACK
 
-IMPORT_FACTOR_MATCH = re.compile('^FROM\s+([^\s]+)(\s+(.*)?\s?ACCEPT(.+))?$')
-EXPORT_FACTOR_MATCH = re.compile('^TO\s+([^\s]+)(\s+(.*)?\s?ANNOUNCE(.+))?$')
-DEFAULT_FACTOR_MATCH = re.compile('^TO\s+([^\s]+)(\s+(.*)?\s?NETWORKS(.+)|.*)?$')
+IMPORT_FACTOR_MATCH = re.compile('^FROM\s+([^\s]+)(\s?(.*)\sACCEPT(.+))$')
+EXPORT_FACTOR_MATCH = re.compile('^TO\s+([^\s]+)(\s?(.*)\sANNOUNCE(.+))$')
+DEFAULT_FACTOR_MATCH = re.compile('^TO\s+([^\s]+)(\s?(.*)\sNETWORKS(.+)|.*)$')
 
 ''' End of Tomas' expressions for parsers '''
 
@@ -163,7 +163,7 @@ class PolicyParser:
             if defaultRule:  # default: rule does not need to include filter, then default to ANY
                 fltr = 'ANY'
             else:
-                tools.w("Syntax error: Can not find selectors in:", e, "decomposing expression:", text)
+                logging.warning("Syntax error: Can not find selectors in:", e, "decomposing expression:", text)
                 # raise Exception("Can not find selectors in: "+e)
 
         # here regexps are necessary
@@ -239,8 +239,6 @@ class PolicyParser:
             else:
                 afi = 'ANY'
 
-        # defaultRule = ('AutNumDefaultRule')
-        # factors = _decomposeExpression(text, defaultRule)
         factors = self.decomposeExpression(mytext)
 
         return (direction, afi, [self.normalizeFactor(f, factors[1]) for f in factors[0]])
@@ -260,7 +258,6 @@ class PolicyParser:
         """
 
         res = self.parseRule(mytext, rule, mp)  # return (direction, afi, [(subject, filter)])
-        # tools.w(str(res))
 
         try:
             peer_as = self.peerings.returnPeering(res[2][0][0])
@@ -273,23 +270,24 @@ class PolicyParser:
         if res[1] != 'ANY' and res[1] != 'ANY.UNICAST':
             if ((ipv6 and res[1] != 'IPV6.UNICAST') or
                     ((not ipv6) and res[1] != 'IPV4.UNICAST')):
-                return 1
+                return
 
         """
             Separation of roles. The peer class will get a pointer to the filter (hash value)
             while the real filter will be stored temporarily for the second round of resolving.
         """
-        # Create a hash of the filter expression
-        ha = str(xxhash.xxh64(res[2][0][1]).hexdigest())
+        if res[2][0][1] != 'ANY':
+            # Create a hash of the filter expression
+            ha = str(xxhash.xxh64(res[2][0][1]).hexdigest())
 
-        pf = rpsl.peerFilter(ha, res[1], res[2][0][1])
-        self.fltrExpressions.appendFilter(pf)
+            pf = rpsl.peerFilter(ha, res[1], res[2][0][1])
+            self.fltrExpressions.appendFilter(pf)
 
-        # Append in the peer a filter set(direction, afi, hash)
-        try:
-            peer_as.appendFilter((res[0], res[1], ha), mp)
-        except:
-            logging.warning("Failed to append filter %s on peer %s" % (ha, peer_as.origin))
+            # Append in the peer a filter set(direction, afi, hash)
+            try:
+                peer_as.appendFilter((res[0], res[1], ha), mp)
+            except:
+                logging.warning("Failed to append filter %s on peer %s" % (ha, peer_as.origin))
 
         pp = rpsl.PeeringPoint(mp)
         if re.search('\sAT\s', mytext, re.I):
@@ -394,7 +392,6 @@ class RSSetParser:
         # TODO, this function needs improvements
         if self.ipv4_enabled:
             for elem in db_object.iterfind('./objects/object[@type="route-set"]/attributes'):
-                # new_member = None
                 for subelem in elem.iterfind('./attribute[@name="members"]'):
                     new_member = subelem.attrib.get("value").strip()
 
@@ -408,7 +405,6 @@ class RSSetParser:
 
         if self.ipv6_enabled:
             for elem in db_object.iterfind('./objects/object[@type="route-set"]/attributes'):
-                # new_member = None
                 for subelem in elem.iterfind('./attribute[@name="mp-members"]'):
                     new_member = subelem.attrib.get("value").strip()
 

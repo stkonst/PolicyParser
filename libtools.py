@@ -1,6 +1,5 @@
 __author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl)'
 import re
-import sys
 
 DEBUG = True
 
@@ -34,17 +33,17 @@ def is_valid_ipv6(item):
 # Exported functions
 
 
-def d(m, *args):
-    """ Print debug message. d('fnc_x dbg x=',1,'y=',2) """
-
-    if DEBUG:
-        for a in args:
-            m += ' ' + str(a)
-        sys.stderr.write(m + "\n")
-
-
-def w(m, *args):
-    """ Print warning message. d('fnc_x dbg x=',1,'y=',2) """
-    for a in args:
-        m += ' ' + str(a)
-    sys.stderr.write(m + "\n")
+# def d(m, *args):
+#     """ Print debug message. d('fnc_x dbg x=',1,'y=',2) """
+#
+#     if DEBUG:
+#         for a in args:
+#             m += ' ' + str(a)
+#         sys.stderr.write(m + "\n")
+#
+#
+# def w(m, *args):
+#     """ Print warning message. d('fnc_x dbg x=',1,'y=',2) """
+#     for a in args:
+#         m += ' ' + str(a)
+#     sys.stderr.write(m + "\n")

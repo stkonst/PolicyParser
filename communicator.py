@@ -1,4 +1,4 @@
-__author__ = 'stavros'
+__author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl)'
 import logging
 
 import requests
@@ -22,7 +22,7 @@ class Communicator:
     def getPolicyByAutnum(self, autnum):
         db_reply = None
         try:
-            db_reply = self._sendDbRequest(self._searchURLbuilder(autnum, None, None))
+            db_reply = self._sendDbRequest(self._searchURLbuilder(autnum, None, (), ('r')))
             logging.debug("Policy received for %s" % autnum)
         except:
             logging.error("Failed to receive policy for %s" % autnum)
@@ -34,7 +34,7 @@ class Communicator:
         # Can make requests for as-set, route-set
         db_reply = None
         try:
-            db_reply = self._sendDbRequest(self._searchURLbuilder(value, None, None))
+            db_reply = self._sendDbRequest(self._searchURLbuilder(value, None, (), ('r')))
         except Exception as e:
             logging.error('Get Filter failed for %s. %s ' % (value, e))
             pass
@@ -44,9 +44,9 @@ class Communicator:
 
         db_reply = None
         if ipv6_enabled:
-            url = self._searchURLbuilder(autnum, "origin", "route", "route6", flags=None)
+            url = self._searchURLbuilder(autnum, "origin", ("route", "route6"), ('r'))
         else:
-            url = self._searchURLbuilder(autnum, "origin", "route")
+            url = self._searchURLbuilder(autnum, "origin", ("route"), ('r'))
 
         try:
             db_reply = self._sendDbRequest(url)
@@ -55,7 +55,7 @@ class Communicator:
             pass
         return db_reply
 
-    def _searchURLbuilder(self, query_string, inverse_attribute, type_filter1, type_filter2=None, flags=None):
+    def _searchURLbuilder(self, query_string, inverse_attribute, type_filters, flags):
         """
         Example:
             http://rest.db.ripe.net/search.xml?query-string=as199664&type-filter=route6&inverse-attribute=origin
@@ -66,12 +66,12 @@ class Communicator:
 
         if inverse_attribute is not None:
             new_url += "&inverse-attribute=%s" % inverse_attribute
-        if type_filter1 is not None:
-            new_url += "&type-filter=%s" % type_filter1
-        if type_filter2 is not None:
-            new_url += "&type-filter=%s" % type_filter2
-        if flags is not None:
-            new_url += "&flags=%s" % flags
+
+        for f in type_filters:
+            new_url += "&type-filter=%s" % f
+
+        for f in flags:
+            new_url += "&flags=%s" % f
 
         return self.db_url + new_url
 
@@ -99,7 +99,7 @@ class Communicator:
                 logging.warning("RIPE-API: Internal Server Error")
                 raise Exception("RIPE-API_ERROR_500")
             else:
-                logging.warning("Unknown RIPE API response")
+                logging.warning("Unknown RIPE-API response (%s)" % r.status_code)
                 raise Exception("RIPE-API_ERROR_UNKNOWN")
         except:
             # dunno, we got another type of Error

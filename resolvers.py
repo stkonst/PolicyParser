@@ -25,7 +25,7 @@ class filterResolver:
 
         for pf in self.peerFilters.enumerateObjs():
             'TODO: Maybe a try-except will help better'
-            pf.queue, new_ASNs, new_asSets, new_rsSets = analyzer.analyze_filter(pf.expression)
+            output_queue, new_ASNs, new_asSets, new_rsSets = analyzer.analyze_filter(pf.expression)
 
             for a in new_ASNs:
                 self.ASNList.add(a)
@@ -40,7 +40,7 @@ class filterResolver:
             for r in new_rsSets:
                 self._resolveRSSet(r, -1)
 
-                # self._doOperations()
+            pf.statements = analyzer.compose_filter(output_queue)
 
     def _resolveASN(self, asn):
 

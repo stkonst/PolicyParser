@@ -17,7 +17,6 @@ ops = {
 
 
 class Condition():
-
     def __init__(self, allow, category, data):
         """Condition of a Term.
 
@@ -43,7 +42,6 @@ class Condition():
 
 
 class Term():
-
     def __init__(self, allow):
         """Term of the evaluated filter. It is a constructing part of the filter
         and groups Conditions under the same policy.
@@ -157,11 +155,11 @@ def OR(queue):
         raise errors.FilterCompositionError("Unknown operand: '{}'".format(a[0]))
 
     # Operand 'b'
-    if b[0] =='OR':
+    if b[0] == 'OR':
         # If 'a' was a simple operand.
         if simple_operands:
             result = evaluate_simple_operand_with_operation(
-                    simple_operands.pop(), b[1])
+                simple_operands.pop(), b[1])
         elif temp_result:
             # If 'a' was an OR operation.
             if temp_result[0] == 'OR':
@@ -177,7 +175,7 @@ def OR(queue):
         # If 'a' was a simple operand.
         if simple_operands:
             result = evaluate_simple_operand_with_operation(
-                    simple_operands.pop(), b[1], check_nested_NOT=True)
+                simple_operands.pop(), b[1], check_nested_NOT=True)
         elif temp_result:
             # If 'a' was an OR operation.
             if temp_result[0] == 'OR':
@@ -191,10 +189,10 @@ def OR(queue):
         if temp_result:
             if temp_result[0] == 'OR':
                 result = evaluate_simple_operand_with_operation(
-                        b[1], temp_result[1])
+                    b[1], temp_result[1])
             elif temp_result[0] == 'AND':
                 result = evaluate_simple_operand_with_operation(
-                        b[1], temp_result[1], check_nested_NOT=True)
+                    b[1], temp_result[1], check_nested_NOT=True)
             else:
                 raise errors.FilterCompositionError("Unknown operation '{}'".format(temp_result[0]))
         # If both operands are simple also add this to the simple_operands list.
@@ -337,7 +335,7 @@ def AND(queue):
         # If 'a' was a simple operand.
         if simple_operands:
             result = evaluate_simple_operand_with_operation(
-                    simple_operands.pop(), b[1], check_nested_NOT=True)
+                simple_operands.pop(), b[1], check_nested_NOT=True)
         elif temp_result:
             # If 'a' was an OR operation.
             if temp_result[0] == 'OR':
@@ -352,7 +350,7 @@ def AND(queue):
         # If 'a' was a simple operand.
         if simple_operands:
             result = evaluate_simple_operand_with_operation(
-                    simple_operands.pop(), b[1])
+                simple_operands.pop(), b[1])
         elif temp_result:
             # If 'a' was an OR operation.
             if temp_result[0] == 'OR':
@@ -366,11 +364,11 @@ def AND(queue):
             # If 'a' was an OR operation.
             if temp_result[0] == 'OR':
                 result = evaluate_simple_operand_with_operation(
-                        b[1], temp_result[1], check_nested_NOT=True)
+                    b[1], temp_result[1], check_nested_NOT=True)
             # If 'a' was an AND operation.
             elif temp_result[0] == 'AND':
                 result = evaluate_simple_operand_with_operation(
-                        b[1], temp_result[1])
+                    b[1], temp_result[1])
             else:
                 raise errors.FilterCompositionError("Unknown operation '{}'".format(temp_result[0]))
         # If both operands are simple also add this to the simple_operands list.
@@ -419,8 +417,8 @@ def NOT(queue):
     if a[0] in ['AND', 'OR']:
         pass
         # XXX Not supported functionality! Keep here for now!
-        #result = deque()
-        #for term in a[1]:
+        # result = deque()
+        # for term in a[1]:
         #    if term.allow:
         #        for member in term.members:
         #            new_term = Term(not term.allow)
@@ -429,7 +427,7 @@ def NOT(queue):
         #    else:
         #        term.allow = not term.allow
         #        result.append(term)
-        #return (a[0], result)
+        # return (a[0], result)
     else:
         a[1].allow = False
         return ((a[0], a[1]), a_has_nested_operation)
@@ -514,30 +512,30 @@ if __name__ == "__main__":
 
     for i, TEST_STRING in enumerate(TEST_STRINGS):
         try:
-            print "--- Filter: {} ---".format(i+1)
+            print "--- Filter: {} ---".format(i + 1)
             print "Input"
             print "-----"
             print "{}".format(TEST_STRING)
             print
             out, _, _, _ = analyzer.analyze_filter(TEST_STRING)
-            #print "Analyzed"
-            #print "--------"
-            #print "{}".format([ desc if desc in ops else value for desc, value in out])
-            #print
+            # print "Analyzed"
+            # print "--------"
+            # print "{}".format([ desc if desc in ops else value for desc, value in out])
+            # print
             result = compose_filter(out)
-            #print "Result"
-            #print "------"
-            #print "{}".format(result)
-            #print
+            # print "Result"
+            # print "------"
+            # print "{}".format(result)
+            # print
             print "Terms"
             print "-----"
             for term in result[1]:
                 print "Allow: {}".format(term.allow)
                 print "Members: {}".format([m.data for m in term.members])
                 print
-            #print "-{}".format(result[0])
-            #for x in result[1]:
-            #    traverse_result(x, 1)
+                # print "-{}".format(result[0])
+                # for x in result[1]:
+                #    traverse_result(x, 1)
         except Exception as e:
             print "Error: {}".format(e)
         finally:

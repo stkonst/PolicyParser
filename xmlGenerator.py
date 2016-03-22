@@ -49,8 +49,9 @@ class xmlGenerator:
     def getPolicyTemplate(self, autnum):
 
         template_root = et.Element('root')
+
         template_root.append(et.Comment('This is a resolved XML policy file for ' + autnum))
-        template_root.append(et.Comment('Datetime of creation ( %s )' % datetime.datetime.now()))
+        et.SubElement(template_root, 'datetime').text = str(datetime.datetime.now())
 
         et.SubElement(template_root, 'prefix-lists')
 
@@ -62,8 +63,7 @@ class xmlGenerator:
 
     def _filterToXML(self, peerFilter):
 
-        fltr_root = et.Element('peering-filter',
-                               attrib={"type": str(peerFilter.type), "hash-value": peerFilter.hashValue})
+        fltr_root = et.Element('peering-filter', attrib={"hash-value": peerFilter.hashValue})
         et.SubElement(fltr_root, "expression").text = peerFilter.expression
         et.SubElement(fltr_root, "statements")
 
