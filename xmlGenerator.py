@@ -17,11 +17,14 @@ class xmlGenerator:
         elif PolicyActionList.direction == "export":
             new_actions = et.Element('actions_out')
 
-        # TODO Insert order of applying actions
         while PolicyActionList.actionDir:
             i, ac = PolicyActionList.actionDir.popitem()
-            if ac.rp_operator == ".=":
+            if ac.rp_operator == "append":
                 new_actions.set(ac.rp_attr.lower(), "append(%s)" % ac.rp_value)
+            elif ac.rp_operator == "delete":
+                new_actions.set(ac.rp_attr.lower(), "delete(%s)" % ac.rp_value)
+            elif ac.rp_operator == "prepend":
+                new_actions.set(ac.rp_attr.lower(), "prepend(%s)" % ac.rp_value)
             elif ac.rp_operator == "=":
                 new_actions.set(ac.rp_attr.lower(), ac.rp_value)
 
@@ -65,7 +68,22 @@ class xmlGenerator:
 
         fltr_root = et.Element('peering-filter', attrib={"hash-value": peerFilter.hashValue})
         et.SubElement(fltr_root, "expression").text = peerFilter.expression
-        et.SubElement(fltr_root, "statements")
+        statement_root = et.SubElement(fltr_root, "statements")
+
+        for i, t in enumerate(peerFilter.statements):
+            if t.allow:
+                st = et.SubElement(statement_root, 'statement', attrib={'order': str(i), 'type': 'accept'})
+            else:
+                st = et.SubElement(statement_root, 'statement', attrib={'order': str(i), 'type': 'deny'})
+
+            for item in t.members:
+                if item.category == "AS_PATH":
+                    et.SubElement(st, 'as-path').text = str(item.data[1])
+                elif item.category in ("AS", "AS_set", "rs_set"):
+                    et.SubElement(st, 'prefix-list').text = str(item.data)
+                elif item.category == "prefix_list":
+                    for p in item.data:
+                        et.SubElement(st, 'prefix-list').text = p
 
         return fltr_root
 
@@ -77,14 +95,16 @@ class xmlGenerator:
         for r in ASNObject.routeObjDir.originTableV6.itervalues():
             et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
 
-    def _RouteSetToXML(self, RouteSetObject, lists_root):
-        pl = et.SubElement(lists_root, 'prefix-list', attrib={'name': RouteSetObject.getKey(),
-                                                              'hash-value': RouteSetObject.hash})
+    def _RouteSetToXML(self, RouteSetObject, RouteSetObjectdir, pl):
+
         for r in RouteSetObject.members.originTable.itervalues():
             et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
 
         for r in RouteSetObject.mp_members.originTableV6.itervalues():
             et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+
+        for t in RouteSetObject.RSSetsDir:
+            self._RouteSetToXML(RouteSetObjectdir.RouteSetObjDir[t], RouteSetObjectdir, pl)
 
     def _ASSETtoXML(self, AsSetObject, ASNObjectDir, AsSetObjectDir, pl_root):
 
@@ -154,24 +174,33 @@ class xmlGenerator:
         for p, val in PeerObjDir.peerTable.iteritems():
             self.xml_policy.find('peering-policy').append(self.peerToXML(val))
 
-    def convertListsToXML(self, ASNList, ASNObjectDir, RouteSetObjectdir, AsSetObjectDir):
+    def convertListsToXML(self, ASNList, ASNObjectDir, RSSetList, RouteSetObjectdir, ASSetList, AsSetObjectDir):
 
         p = self.xml_policy.find('prefix-lists')
-        for s in AsSetObjectDir.asSetObjDir.itervalues():
-            pl = et.SubElement(p, 'prefix-list', attrib={'name': s.getKey(), 'hash-value': s.hash})
-            self._ASSETtoXML(s, ASNObjectDir, AsSetObjectDir, pl)
+        for s in ASSetList:
+            try:
+                obj = AsSetObjectDir.asSetObjDir[s]
+                pl = et.SubElement(p, 'prefix-list', attrib={'name': obj.getKey()})
+                self._ASSETtoXML(obj, ASNObjectDir, AsSetObjectDir, pl)
+            except KeyError:
+                pass
 
         for v in ASNList:
             try:
                 obj = ASNObjectDir.asnObjDir[v]
-                pl = et.SubElement(p, 'prefix-list', attrib={'name': obj.origin, 'hash-value': obj.hash})
+                pl = et.SubElement(p, 'prefix-list', attrib={'name': obj.origin})
                 self._AStoXML(obj, pl)
 
             except KeyError:
                 pass
 
-        for v in RouteSetObjectdir.RouteSetObjDir.itervalues():
-            self._RouteSetToXML(v, p)
+        for v in RSSetList:
+            try:
+                obj = RouteSetObjectdir.RouteSetObjDir[v]
+                pl = et.SubElement(p, 'prefix-list', attrib={'name': obj.getKey()})
+                self._RouteSetToXML(obj, RouteSetObjectdir, pl)
+            except KeyError:
+                pass
 
     def __str__(self):
         return et.tostring(self.xml_policy, encoding='UTF-8')

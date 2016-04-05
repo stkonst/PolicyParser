@@ -31,7 +31,9 @@ class Communicator:
         return db_reply
 
     def getFilterSet(self, value):
+        #
         # Can make requests for as-set, route-set
+        #
         db_reply = None
         try:
             db_reply = self._sendDbRequest(self._searchURLbuilder(value, None, (), ('r')))

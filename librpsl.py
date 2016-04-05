@@ -31,7 +31,6 @@ def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
         Maybe use Multithreading to fetch necessary info from RIPE DB.
     """
 
-    ' TODO: Implement multi-threading to resolve fltrExpressions'
     fr = resolvers.filterResolver(pp.fltrExpressions, com, ipv6)
     fr.resolveFilters()
 
@@ -42,7 +41,7 @@ def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
 
     xmlgen.convertPeersToXML(pp.peerings)
     xmlgen.convertFiltersToXML(pp.fltrExpressions)
-    xmlgen.convertListsToXML(fr.ASNList, fr.dataPool, fr.RSSetDir, fr.asSetdir)
+    xmlgen.convertListsToXML(fr.ASNList, fr.dataPool, fr.RSSetList, fr.RSSetDir, fr.ASSetList, fr.asSetdir)
 
     if output == "browser":
         return xmlgen.__str__()
@@ -53,42 +52,42 @@ def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
         return xmlgen.__str__()
 
 # ~~~ Script starts here ~~~
+if __name__ == "__main__":
+    starting_flag = True
+    if len(sys.argv) < 2:
+        print "\nIncomplete number of parameters. \n%s\n" % help_message
+        starting_flag = False
 
-starting_flag = True
-if len(sys.argv) < 2:
-    print "\nIncomplete number of parameters. \n%s\n" % help_message
-    starting_flag = False
-
-else:
-    for arg in sys.argv:
-        if arg == "-a":
-            if rpsl.is_ASN(sys.argv[sys.argv.index('-a') + 1]):
-                params["as_number"] = sys.argv[sys.argv.index('-a') + 1].upper()
-            else:
-                print "Invalid aut-number"
-                starting_flag = False
-                exit(1)
-        if arg == "-o":
-            params["output_file"] = sys.argv[sys.argv.index('-o') + 1]
-
-        if arg == "-4":
-            params["ipv4"] = "True"
-
-        if arg == "-6":
-            params["ipv6"] = "True"
-
-print("Configuration done. Starting...")
-
-if starting_flag:
-    logging.getLogger("requests").setLevel(logging.WARNING)
-    if "output_file" in params:
-        logging.basicConfig(filename=params["output_file"] + '.log', level=logging.DEBUG)
-        xml_result = buildXMLpolicy(params.get("as_number"), output='file')
-        f = open(params["output_file"], mode='w')
-        f.write(xml_result)
-        f.close()
     else:
-        logging.basicConfig(level=logging.DEBUG)
-        print buildXMLpolicy(params.get("as_number"), output='screen')
+        for arg in sys.argv:
+            if arg == "-a":
+                if rpsl.is_ASN(sys.argv[sys.argv.index('-a') + 1]):
+                    params["as_number"] = sys.argv[sys.argv.index('-a') + 1].upper()
+                else:
+                    print "Invalid aut-number"
+                    starting_flag = False
+                    exit(1)
+            if arg == "-o":
+                params["output_file"] = sys.argv[sys.argv.index('-o') + 1]
 
-    logging.info("All done. XML policy is ready.")
+            if arg == "-4":
+                params["ipv4"] = "True"
+
+            if arg == "-6":
+                params["ipv6"] = "True"
+
+    print("Configuration done. Starting...")
+
+    if starting_flag:
+        logging.getLogger("requests").setLevel(logging.WARNING)
+        if "output_file" in params:
+            logging.basicConfig(filename=params["output_file"] + '.log', level=logging.DEBUG)
+            xml_result = buildXMLpolicy(params.get("as_number"), output='file')
+            f = open(params["output_file"], mode='w')
+            f.write(xml_result)
+            f.close()
+        else:
+            logging.basicConfig(level=logging.DEBUG)
+            print buildXMLpolicy(params.get("as_number"), output='screen')
+
+        logging.info("All done. XML policy is ready.")

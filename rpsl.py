@@ -12,10 +12,7 @@ RS_SET_MATCH = re.compile('^RS-(\w|-)+$')
 RTR_SET_MATCH = re.compile('^RTR-(\w|-)+$')
 FLTR_SET_MATCH = re.compile('^FLTR-(\w|-)+$')
 
-# Regex operators
-# {m} {m,} {m,n}    --> ~?\{\d+(?:,\d*)?\}
-# OR
-# * + ? ~ ~* ~+     --> (?:\?|~?(?:\*|\+)?)
+
 regex_ops = '(?:(?:\?|~?(?:\*|\+)?)|~?\{\d+(?:,\d*)?\})?'
 AS_PATH_MEMBER_MATCH = [ # ASN with regex operators
                         re.compile("^\^?{asn}{regexops}\$?$".format(asn='AS[0-9]+',regexops=regex_ops)),
@@ -85,7 +82,6 @@ class RpslObject(object):
 class RouteObject(RpslObject):
     """
     Internal representation of route RPSL object.
-    Thanks to Tomas
     """
 
     ROUTE_ATTR = 'ROUTE'
@@ -95,7 +91,6 @@ class RouteObject(RpslObject):
     def __init__(self, route, origin):
         self.route = route
         self.origin = origin
-        # self.memberof = []
 
     def getKey(self):
         return self.route
@@ -150,9 +145,9 @@ class ASNObject(RpslObject):
     Internal representation of an AS
     """
 
-    def __init__(self, asnum, hv):
+    def __init__(self, asnum):
         self.origin = asnum
-        self.hash = hv
+        # self.hash = hv
         self.routeObjDir = RouteObjectDir()
 
     def getKey(self):
@@ -213,10 +208,10 @@ class AsSetObject(RpslObject):
     ASSET_ATTR = 'AS-SET'
     MEMBERS_ATTR = 'MEMBERS'
 
-    def __init__(self, setname, hv):
+    def __init__(self, setname):
         RpslObject.__init__(self)
         self.as_set = setname
-        self.hash = hv
+        # self.hash = hv
         self.ASNmembers = set()
         self.ASSetmember = set()
 
@@ -247,73 +242,14 @@ class PeeringSetObject(RpslObject):
     PEERING_ATTR = 'PEERING'
     MP_PEERING_ATTR = 'MP-PEERING'
 
-    @staticmethod
-    def _parsePeering(p):
-        return p.strip().split(' ')[0]
-
-    # @staticmethod
-    # def isPeeringSet(name):
-    #     """
-    #     Returns True when the name appears to be as-set name (=key)
-    #     according to RPSL specs.
-    #     """
-    #     return str(name).upper().find('PRNG-') > -1
-
     def __init__(self, textlines):
         RpslObject.__init__(self, textlines)
         self.peering_set = None
         self.peering = []
         self.mp_peering = []
 
-        # for (a, v) in RpslObject.splitLines(self.text):
-        #     if a == self.PEERINGSET_ATTR:
-        #         self.peering_set = v.strip().upper()
-        #
-        #     elif a == self.PEERING_ATTR:
-        #         self.peering.append(PeeringSetObject._parsePeering(v))
-        #
-        #     elif a == self.MP_PEERING_ATTR:
-        #         self.mp_peering.append(PeeringSetObject._parsePeering(v))
-        #     else:
-        #         pass  # ignore unrecognized lines
-        #
-        # if not self.peering_set:
-        #     raise Exception("Can not create AsSetObject out of text: " + str(textlines))
-
     def getKey(self):
         return self.peering_set
-
-    # def recursiveMatch(self, target, hashObjDir, recursionList=None):
-    #     """
-    #     This methods does recusion in the objects peering and mp-peering sections
-    #     and tries to find interpreter with the target identifier.
-    #
-    #     This is being used by filter matching instead of full filter recursion because we
-    #     know that this type of object could hold only ASNs or references to another
-    #     peering-sets and therefore full filter recursion is not needed and this special
-    #     recursion offers mild speedup.
-    #     """
-    #     if recursionList == None:
-    #         recursionList = []
-    #
-    #     # common.d("PeeringSetObject recursiveMatch: target", target, 'in', self.getKey(),
-    #     #          'recursionList', recursionList)
-    #
-    #     # prevent recusion loop
-    #     if self.getKey() in recursionList:
-    #         return False
-    #     recursionList.append(self.getKey())
-    #
-    #     if target in self.peering or target in self.mp_peering:
-    #         return True
-    #
-    #     for m in (self.peering + self.mp_peering):
-    #         if self.isPeeringSet(m) and m in hashObjDir.table:
-    #             r = hashObjDir.table[m].recursiveMatch(target, hashObjDir, recursionList)
-    #             if r:
-    #                 return True
-    #
-    #     return False
 
     def __str__(self):
         return 'PeeringSetObject: %s -< %s mp: %s' % (self.peering_set, str(self.peering), str(self.mp_peering))
@@ -331,28 +267,6 @@ class FilterSetObject(RpslObject):
         self.filter_set = None
         self.filter = None
         self.mp_filter = None
-
-        # for (a, v) in RpslObject.splitLines(self.text):
-        #     if a == self.FILTERSET_ATTR:
-        #         self.filter_set = v.strip().upper()
-        #
-        #     elif a == self.FILTER_ATTR:
-        #         self.filter = v.strip()
-        #
-        #     elif a == self.MP_FILTER_ATTR:
-        #         self.mp_filter = v.strip()
-        #
-        #     else:
-        #         pass  # ignore unrecognized lines
-        #
-        # if not self.filter_set:
-        #     raise Exception("Can not create FilterSetObject out of text: " + str(textlines))
-
-    # @staticmethod
-    # def isFltrSet(fltrsetid):
-    #     """ Returns True when the name appears to be filter-set name (=key)
-    #     according to RPSL specs. """
-    #     return fltrsetid.upper().find('FLTR-') > -1
 
     def getKey(self):
         return self.filter_set
@@ -377,13 +291,13 @@ class RouteSetObject(RpslObject):
     MEMBERS_ATTR = 'MEMBERS'
     MP_MEMBERS_ATTR = "MP-MEMBERS"
 
-    def __init__(self, setname, hv):
+    def __init__(self, setname):
         RpslObject.__init__(self)
         self.route_set = setname
-        self.hash = hv
+        # self.hash = hv
         self.members = RouteObjectDir()
         self.mp_members = RouteObjectDir()
-        self.RSSetsDir = {}
+        self.RSSetsDir = set()
 
     def getKey(self):
         return self.route_set
@@ -450,8 +364,8 @@ class PeeringPoint:
 
     def getKey(self):
         """
-        Pseudo key generator for dictionary appending
-        if no IPs are present then actions_in are applied in
+        Pseudo key generator for dictionary appending.
+        If no IPs are present then actions_in are applied in
         every ingress/egress point of the domain
         """
         return str(self.local_ip) + "|" + str(self.remote_ip)

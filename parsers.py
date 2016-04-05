@@ -15,21 +15,29 @@ FACTOR_SPLIT_NETWORKS = 'NETWORKS'  # regexp would be better but slower
 FACTOR_CONST_ACCEPT = 'ACCEPT'
 FACTOR_CONST_ANNOUNCE = 'ANNOUNCE'
 FACTOR_CONST_NETWORKS = 'NETWORKS'
-FACTOR_SPLIT_FROM = re.compile('^(|.*\s+)FROM\s+')
-FACTOR_SPLIT_TO = re.compile('^(|.*\s+)TO\s+')
-AFI_MATCH = re.compile('^AFI\s+([^\s]+)\s+(.*)$')
-PARSE_RANGE = re.compile('^\^([0-9]+)-([0-9]+)$')
+FACTOR_SPLIT_FROM = re.compile('^(|.*\s+)FROM\s+', re.I)
+FACTOR_SPLIT_TO = re.compile('^(|.*\s+)TO\s+', re.I)
+AFI_MATCH = re.compile('^AFI\s+([^\s]+)\s+(.*)$', re.I)
+PARSE_RANGE = re.compile('^\^([0-9]+)-([0-9]+)$', re.I)
 ################# HACK HACK HACK
-AFI_MATCH_HACK = re.compile('^AFI\s+(IPV6.UNICAST)(FROM.*)$')
+AFI_MATCH_HACK = re.compile('^AFI\s+(IPV6.UNICAST)(FROM.*)$', re.I)
 ################# END OF HACK
 
-IMPORT_FACTOR_MATCH = re.compile('^FROM\s+([^\s]+)(\s?(.*)\sACCEPT(.+))$')
-EXPORT_FACTOR_MATCH = re.compile('^TO\s+([^\s]+)(\s?(.*)\sANNOUNCE(.+))$')
-DEFAULT_FACTOR_MATCH = re.compile('^TO\s+([^\s]+)(\s?(.*)\sNETWORKS(.+)|.*)$')
+IMPORT_FACTOR_MATCH = re.compile('^FROM\s+([^\s]+)(\s?(.*)\sACCEPT(.+))$', re.I)
+EXPORT_FACTOR_MATCH = re.compile('^TO\s+([^\s]+)(\s?(.*)\sANNOUNCE(.+))$', re.I)
+DEFAULT_FACTOR_MATCH = re.compile('^TO\s+([^\s]+)(\s?(.*)\sNETWORKS(.+)|.*)$', re.I)
 
 ''' End of Tomas' expressions for parsers '''
 
 ACTION_RESHAPE = re.compile(r'\s|[{\s*|\s*}]')
+ACTION_COMMUNITY_APPEND = re.compile('\.(?:append|=)[{(]([^)}]*)[)}]', re.I)
+ACTION_COMMUNITY_DELETE = re.compile('delete\((.*)\)', re.I)
+ACTION_ASPATH_PREPEND = re.compile('prepend\((.*)\)', re.I)
+
+EXTRACT_ACTIONS_EXPORT = re.compile('ACTION(.*)ANNOUNCE', re.I)
+EXTRACT_ACTIONS_IMPORT = re.compile('ACTION(.*)ACCEPT', re.I)
+EXTACT_IPS_V4 = re.compile('\s\w*\s([0-9\.]+)\sAT?\s?([0-9\.]*)', re.I)
+EXTACT_IPS_V6 = re.compile('\s\w*\s([0-9a-z:]+)\sAT?\s?([0-9a-z:]*)', re.I)
 
 
 class PolicyParser:
@@ -89,33 +97,62 @@ class PolicyParser:
 
     def extractIPs(self, policy_object, PeeringPoint, mp=False):
 
-        remoteIP = re.split('\sAT\s', policy_object, re.I)[0].split()[-1]
-        localIP = re.split('\sACTION\s', policy_object, re.I)[0].split()[-1]
-
         if mp:
             """ RPSL Allows also 1 out of the 2 IPs to exist. """
-            # TODO make it less strict and more flexible
-            if tools.is_valid_ipv6(remoteIP) and tools.is_valid_ipv6(localIP):
+
+            if "AT" in policy_object:
+                remoteIP = re.search(EXTACT_IPS_V6, policy_object).group(1)
+                localIP = re.search(EXTACT_IPS_V6, policy_object).group(2)
+                if not tools.is_valid_ipv6(remoteIP) or not tools.is_valid_ipv6(localIP):
+                    logging.warn("Invalid IPv6 detected/extracted")
+                    return
                 PeeringPoint.appendAddresses(localIP, remoteIP)
-        elif tools.is_valid_ipv4(remoteIP) and tools.is_valid_ipv4(localIP):
-            PeeringPoint.appendAddresses(localIP, remoteIP)
+
+            else:
+                remoteIP = re.search(EXTACT_IPS_V6, policy_object).group(1)
+                if not tools.is_valid_ipv6(remoteIP):
+                    logging.warn("Invalid IPv6 detected/extracted")
+                    return
+                PeeringPoint.appendAddresses("", remoteIP)
+
+        else:
+            if "AT" in policy_object:
+                remoteIP = re.search(EXTACT_IPS_V4, policy_object).group(1)
+                localIP = re.search(EXTACT_IPS_V4, policy_object).group(2)
+                if not tools.is_valid_ipv4(remoteIP) or not tools.is_valid_ipv4(localIP):
+                    logging.warn("Invalid IPv4 detected/extracted")
+                    return
+                PeeringPoint.appendAddresses(localIP, remoteIP)
+
+            else:
+                remoteIP = re.search(EXTACT_IPS_V4, policy_object).group(1)
+                if not tools.is_valid_ipv4(remoteIP):
+                    logging.warn("Invalid IPv4 detected/extracted")
+                    return
+                PeeringPoint.appendAddresses("", remoteIP)
 
     def extractActions(self, line, PolicyActionList, export=False):
 
         if export:
-            actions = re.search(r'ACTION(.*)ANNOUNCE', line, re.I).group(1).split(";")
+            actions = filter(None, re.search(EXTRACT_ACTIONS_EXPORT, line).group(1).strip(" ").split(";"))
         else:
-            actions = re.search(r'ACTION(.*)ACCEPT', line, re.I).group(1).split(";")
+            actions = filter(None, re.search(EXTRACT_ACTIONS_IMPORT, line).group(1).strip(" ").split(";"))
 
-        for i, a in enumerate(actions):
-            reshaped = re.sub(ACTION_RESHAPE, '', a)
-            if '.=' in reshaped:
-                # I know it's a HACK. But I will blame RPSL 4 that
-                items = reshaped.split('.=')
-                PolicyActionList.appendAction(rpsl.PolicyAction(i, items[0], ".=", items[1]))
-            elif '=' in reshaped:
-                items = reshaped.split('=')
-                PolicyActionList.appendAction(rpsl.PolicyAction(i, items[0], "=", items[1]))
+        for i, action in enumerate(actions):
+
+            if 'community' in action:
+                val = re.search(ACTION_COMMUNITY_APPEND, action).group(1)
+                if val is not None:
+                    PolicyActionList.appendAction(rpsl.PolicyAction(i, "community", "append", val))
+                else:
+                    val = re.search(ACTION_COMMUNITY_DELETE, action).group(1)
+                    PolicyActionList.appendAction(rpsl.PolicyAction(i, "community", "delete", val))
+            elif 'aspath' in action:
+                val = re.search(ACTION_ASPATH_PREPEND, action).group(1)
+                PolicyActionList.appendAction(rpsl.PolicyAction(i, "aspath", "prepend", val))
+            else:
+                elements = action.split("=")
+                PolicyActionList.appendAction(rpsl.PolicyAction(i, elements[0], "=", elements[1]))
 
     def decomposeExpression(self, text, defaultRule=False):
         def _getFirstGroup(text):
@@ -396,8 +433,12 @@ class RSSetParser:
                     new_member = subelem.attrib.get("value").strip()
 
                     if rpsl.is_rs_set(new_member):
-                        if new_member not in old_RSSetDir.RouteSetObjDir.keys():
+                        self.setObj.RSSetsDir.add(new_member)
+                        try:
+                            old_RSSetDir.RouteSetObjDir[new_member]
+                        except KeyError:
                             new_RSSet.add(new_member)
+                            pass
 
                     else:
                         ro = rpsl.RouteObject(new_member, self.setObj.route_set)
@@ -409,8 +450,12 @@ class RSSetParser:
                     new_member = subelem.attrib.get("value").strip()
 
                     if rpsl.is_rs_set(new_member):
-                        if new_member not in old_RSSetDir.RouteSetObjDir.keys():
+                        self.setObj.RSSetsDir.add(new_member)
+                        try:
+                            old_RSSetDir.RouteSetObjDir[new_member]
+                        except KeyError:
                             new_RSSet.add(new_member)
+                            pass
 
                     else:
                         ro = rpsl.Route6Object(new_member, "None")
