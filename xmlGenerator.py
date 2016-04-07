@@ -120,11 +120,7 @@ class xmlGenerator:
     def _peeringPointToXML(self, points_root, PeeringPoint):
 
         if PeeringPoint.getKey() is not "|":
-            if PeeringPoint.mp:
-                pp_root = et.Element('peering-point')
-                pp_root.set("type", "IPv6")
-            else:
-                pp_root = et.Element('peering-point', attrib={"type": "IPv4"})
+            pp_root = et.Element('peering-point', attrib={"afi": PeeringPoint.afi})
 
             p = et.SubElement(pp_root, "point",
                               attrib={"local-IP": PeeringPoint.local_ip, "remote-IP": PeeringPoint.remote_ip})

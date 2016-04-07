@@ -6,6 +6,7 @@ import re
 import xxhash
 
 import libtools as tools
+import errors
 import rpsl
 
 ''' Start of Tomas' expressions for parsers '''
@@ -36,8 +37,9 @@ ACTION_ASPATH_PREPEND = re.compile('prepend\((.*)\)', re.I)
 
 EXTRACT_ACTIONS_EXPORT = re.compile('ACTION(.*)ANNOUNCE', re.I)
 EXTRACT_ACTIONS_IMPORT = re.compile('ACTION(.*)ACCEPT', re.I)
-EXTACT_IPS_V4 = re.compile('\s\w*\s([0-9\.]+)\sAT?\s?([0-9\.]*)', re.I)
-EXTACT_IPS_V6 = re.compile('\s\w*\s([0-9a-z:]+)\sAT?\s?([0-9a-z:]*)', re.I)
+# EXTACT_IPS_V4 = re.compile('\s\w*\s([0-9\.]+)\sAT?\s?([0-9\.]*)', re.I)
+# EXTACT_IPS_V6 = re.compile('\s\w*\s([0-9a-z:]+)\sAT?\s?([0-9a-z:]*)', re.I)
+IP_EXTRACT_RE = re.compile("(?P<afi>AFI\s\w*\.\w*)?\s?(FROM|TO)\sAS(?:\d*)\s(?P<remote>\S*)\sAT\s(?P<local>\S*)", re.I)
 
 
 class PolicyParser:
@@ -59,80 +61,63 @@ class PolicyParser:
 
         logging.debug('Will parse policy for %s' % self.autnum)
         for elem in self.etContent.iterfind('./objects/object[@type="aut-num"]/attributes/attribute'):
+            if "import" == elem.attrib.get("name"):
+                try:
+                    self.interpreter(elem.attrib.get("value").upper(), mp=False, rule="import")
 
-            line_parsed = False
-            if self.ipv4_enabled:
+                except:
+                    "TODO: Catch a custom error"
+                    logging.warning("Failed to parse import {%s}" % elem.attrib.get("value"))
+                    pass
 
-                if "import" == elem.attrib.get("name"):
-                    try:
-                        self.interpreter(elem.attrib.get("value").upper(), mp=False, rule="import")
-                        line_parsed = True
-                    except:
-                        logging.warning("Failed to parse import {%s}" % elem.attrib.get("value"))
-                        pass
+            elif "export" == elem.attrib.get("name"):
+                try:
+                    self.interpreter(elem.attrib.get("value").upper(), mp=False, rule="export")
 
-                elif "export" == elem.attrib.get("name"):
-                    try:
-                        self.interpreter(elem.attrib.get("value").upper(), mp=False, rule="export")
-                        line_parsed = True
-                    except:
-                        logging.warning("Failed to parse export {%s}" % elem.attrib.get("value"))
-                        pass
+                except:
+                    "TODO: Catch a custom error"
+                    logging.warning("Failed to parse export {%s}" % elem.attrib.get("value"))
+                    pass
 
-            if not line_parsed and self.ipv6_enabled:
+            elif "mp-import" == elem.attrib.get("name"):
+                try:
+                    self.interpreter(elem.attrib.get("value").upper(), mp=True, rule="import")
 
-                if "mp-import" == elem.attrib.get("name"):
-                    try:
-                        self.interpreter(elem.attrib.get("value").upper(), mp=True, rule="import")
-                    except:
-                        logging.warning("Failed to parse import {%s}" % elem.attrib.get("value"))
-                        pass
+                except:
+                    "TODO: Catch a custom error"
+                    logging.warning("Failed to parse mp-import {%s}" % elem.attrib.get("value"))
+                    pass
 
-                elif "mp-export" == elem.attrib.get("name"):
-                    try:
-                        self.interpreter(elem.attrib.get("value").upper(), mp=True, rule="export")
-                    except:
-                        logging.warning("Failed to parse export {%s}" % elem.attrib.get("value"))
-                        pass
+            elif "mp-export" == elem.attrib.get("name"):
+                try:
+                    self.interpreter(elem.attrib.get("value").upper(), mp=True, rule="export")
+
+                except:
+                    "TODO: Catch a custom error"
+                    logging.warning("Failed to parse mp-export {%s}" % elem.attrib.get("value"))
+                    pass
 
     def extractIPs(self, policy_object, PeeringPoint, mp=False):
+        """ RPSL Allows also 1 out of the 2 IPs to exist. """
 
-        if mp:
-            """ RPSL Allows also 1 out of the 2 IPs to exist. """
+        items = re.search(IP_EXTRACT_RE, policy_object)
 
-            if "AT" in policy_object:
-                remoteIP = re.search(EXTACT_IPS_V6, policy_object).group(1)
-                localIP = re.search(EXTACT_IPS_V6, policy_object).group(2)
-                if not tools.is_valid_ipv6(remoteIP) or not tools.is_valid_ipv6(localIP):
-                    logging.warn("Invalid IPv6 detected/extracted")
-                    return
-                PeeringPoint.appendAddresses(localIP, remoteIP)
-
+        if tools.is_valid_ipv4(items.group("remote")):
+            if tools.is_valid_ipv4(items.group("local")):
+                PeeringPoint.appendAddresses(items.group("local"), items.group("remote"))
             else:
-                remoteIP = re.search(EXTACT_IPS_V6, policy_object).group(1)
-                if not tools.is_valid_ipv6(remoteIP):
-                    logging.warn("Invalid IPv6 detected/extracted")
-                    return
-                PeeringPoint.appendAddresses("", remoteIP)
-
+                logging.warn("Invalid IPv4 detected/extracted")
+                return
+        elif tools.is_valid_ipv6(items.group("remote")):
+            if tools.is_valid_ipv6(items.group("local")):
+                PeeringPoint.appendAddresses(items.group("local"), items.group("remote"))
+            else:
+                logging.warn("Invalid IPv6 detected/extracted")
+                return
         else:
-            if "AT" in policy_object:
-                remoteIP = re.search(EXTACT_IPS_V4, policy_object).group(1)
-                localIP = re.search(EXTACT_IPS_V4, policy_object).group(2)
-                if not tools.is_valid_ipv4(remoteIP) or not tools.is_valid_ipv4(localIP):
-                    logging.warn("Invalid IPv4 detected/extracted")
-                    return
-                PeeringPoint.appendAddresses(localIP, remoteIP)
-
-            else:
-                remoteIP = re.search(EXTACT_IPS_V4, policy_object).group(1)
-                if not tools.is_valid_ipv4(remoteIP):
-                    logging.warn("Invalid IPv4 detected/extracted")
-                    return
-                PeeringPoint.appendAddresses("", remoteIP)
+            raise errors.IPparseError("Failed to parse IP values")
 
     def extractActions(self, line, PolicyActionList, export=False):
-
         if export:
             actions = filter(None, re.search(EXTRACT_ACTIONS_EXPORT, line).group(1).strip(" ").split(";"))
         else:
@@ -175,6 +160,7 @@ class PolicyParser:
 
             else:
                 if brc != 0:
+                    "TODO: Make it custom error"
                     raise Exception("Brace count does not fit in rule: " + text)
                 else:
                     return text.strip()
@@ -211,6 +197,7 @@ class PolicyParser:
             return ([str('TO ' + f.strip()) for f in FACTOR_SPLIT_TO.split(sel)[2:]], fltr)
 
         else:
+            "TODO: make it custom error"
             raise Exception("Can not find filter factors in: '" + sel + "' in text: " + text)
 
     def normalizeFactor(self, selector, fltr):
@@ -299,6 +286,7 @@ class PolicyParser:
         try:
             peer_as = self.peerings.returnPeering(res[2][0][0])
         except Exception:
+            "TODO: Catch a custom exception"
             peer_as = rpsl.PeerAS(res[2][0][0])
             # logging.debug('New peering found (%s)' % res[2][0][0])
             pass
@@ -317,16 +305,16 @@ class PolicyParser:
             # Create a hash of the filter expression
             ha = str(xxhash.xxh64(res[2][0][1]).hexdigest())
 
-            pf = rpsl.peerFilter(ha, res[1], res[2][0][1])
+            pf = rpsl.peerFilter(ha, res[2][0][1])
             self.fltrExpressions.appendFilter(pf)
 
             # Append in the peer a filter set(direction, afi, hash)
             try:
-                peer_as.appendFilter((res[0], res[1], ha), mp)
-            except:
+                peer_as.appendFilter((res[0], res[1], ha), mp)  # !!!!!!!!!!!!!
+            except errors.UnsupportedAFIerror:
                 logging.warning("Failed to append filter %s on peer %s" % (ha, peer_as.origin))
 
-        pp = rpsl.PeeringPoint(mp)
+        pp = rpsl.PeeringPoint(res[1])
         if re.search('\sAT\s', mytext, re.I):
             """ === warning ===
                 In case of peering on multiple network edges,

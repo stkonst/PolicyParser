@@ -2,6 +2,9 @@ __author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl) '
 __author__ += 'Tomas Hlavacek (tmshlvck@gmail.com) '
 import re
 
+import errors
+
+
 #  TODO Recheck all regex later for fine tuning.
 ASN_MATCH = re.compile('^AS[0-9]+$')
 PFX_FLTR_MATCH = re.compile('^\{([^}]*)\}(\^[0-9+-]+)?$')
@@ -147,7 +150,6 @@ class ASNObject(RpslObject):
 
     def __init__(self, asnum):
         self.origin = asnum
-        # self.hash = hv
         self.routeObjDir = RouteObjectDir()
 
     def getKey(self):
@@ -211,7 +213,6 @@ class AsSetObject(RpslObject):
     def __init__(self, setname):
         RpslObject.__init__(self)
         self.as_set = setname
-        # self.hash = hv
         self.ASNmembers = set()
         self.ASSetmember = set()
 
@@ -294,7 +295,6 @@ class RouteSetObject(RpslObject):
     def __init__(self, setname):
         RpslObject.__init__(self)
         self.route_set = setname
-        # self.hash = hv
         self.members = RouteObjectDir()
         self.mp_members = RouteObjectDir()
         self.RSSetsDir = set()
@@ -328,15 +328,18 @@ class PeerAS:
     def appendFilter(self, info, mp):
 
         # info set(direction, afi, hash)
+        " TODO: FIX IT BECAUSE MP is NOT IPv6"
         if 'IPV4' in info[1]:
             self.v4Filters[info[2]] = (info[0], info[1])
         elif 'IPV6' in info[1]:
             self.v6Filters[info[2]] = (info[0], info[1])
         else:
+            # THAT IS INCORRECT!!!
             if mp:
                 self.v6Filters[info[2]] = (info[0], info[1])
             else:
-                raise Exception("Unsupported AFI found")
+                "TODO: Raise custom Exception"
+                raise errors.UnsupportedAFIerror("Unsupported AFI found")
 
     def appendPeeringPoint(self, PeeringPoint):
         self.peeringPoints[PeeringPoint.getKey()] = PeeringPoint
@@ -351,10 +354,10 @@ class PeerAS:
 
 
 class PeeringPoint:
-    def __init__(self, mp):
+    def __init__(self, afi):
         self.local_ip = ""
         self.remote_ip = ""
-        self.mp = mp
+        self.afi = afi
         self.actions_in = PolicyActionList('import')
         self.actions_out = PolicyActionList('export')
 
@@ -385,6 +388,7 @@ class PeerObjDir:
         if asnum in self.peerTable.keys():
             return self.peerTable[asnum]
         else:
+            "TODO: Make it custom error"
             raise Exception('Peer AS does not exist')
 
     def enumerateObjs(self):
@@ -393,12 +397,10 @@ class PeerObjDir:
 
 
 class peerFilter:
-
-    def __init__(self, hv, afi, expr):
+    def __init__(self, hv, expr):
         self.hashValue = hv
         self.expression = expr
         self.statements = ""
-        self.afi = afi
 
     def __str__(self):
         return str(self.hashValue) + " -> " + self.expression

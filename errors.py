@@ -12,3 +12,11 @@ class FilterCompositionError(Error):
 
 class UnimplementedError(Error):
     pass
+
+
+class UnsupportedAFIerror(Error):
+    pass
+
+
+class IPparseError(Error):
+    pass

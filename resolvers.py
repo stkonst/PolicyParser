@@ -63,6 +63,9 @@ class filterResolver:
 
             pf.statements = analyzer.compose_filter(output_queue)
 
+        logging.debug("ASN: %s AS-SET %s RS-SET %s" % (
+        len(self.dataPool.asnObjDir), len(self.asSetdir.asSetObjDir), len(self.RSSetDir.RouteSetObjDir)))
+
     def _resolveASN(self, asn):
 
         try:
