@@ -69,7 +69,7 @@ class filterResolver:
     def _resolveASN(self, asn):
 
         try:
-            ans = self.communicator.getRoutesByAutnum(asn, ipv6_enabled=True)
+            ans = self.communicator.getRoutesByAutnum(asn, ipv6_enabled=self.ipv6_enabled)
             if ans is None:
                 raise LookupError
 

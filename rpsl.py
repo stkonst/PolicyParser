@@ -130,7 +130,7 @@ class RouteObjectDir(object):
         elif RouteObject.ROUTE_ATTR == 'ROUTE':
             self.originTable[RouteObject.getKey] = RouteObject
         else:
-            raise Exception('Failed to insert Route object to dictionary')
+            raise errors.AppendFilterError('Failed to insert Route object to dictionary')
 
     def checkRouteExists(self, route, v6=False):
         if v6:
@@ -320,26 +320,23 @@ class RouteSetObjectdir:
 class PeerAS:
     def __init__(self, autnum):
         self.origin = autnum
-        # table scheme: {hash-value: (direction, afi)}
-        self.v4Filters = dict()
-        self.v6Filters = dict()
+        # table scheme: {hash-value: direction}
+        self.filters = dict()
+        self.mp_filters = dict()
         self.peeringPoints = dict()
 
     def appendFilter(self, info, mp):
 
+        """ It appends only the hash value of the Peer filter
+            that has been created and stored previously.
+        """
         # info set(direction, afi, hash)
-        " TODO: FIX IT BECAUSE MP is NOT IPv6"
-        if 'IPV4' in info[1]:
-            self.v4Filters[info[2]] = (info[0], info[1])
-        elif 'IPV6' in info[1]:
-            self.v6Filters[info[2]] = (info[0], info[1])
+
+        if mp:
+            self.mp_filters[info[2]] = info[0]
+
         else:
-            # THAT IS INCORRECT!!!
-            if mp:
-                self.v6Filters[info[2]] = (info[0], info[1])
-            else:
-                "TODO: Raise custom Exception"
-                raise errors.UnsupportedAFIerror("Unsupported AFI found")
+            self.filters[info[2]] = info[0]
 
     def appendPeeringPoint(self, PeeringPoint):
         self.peeringPoints[PeeringPoint.getKey()] = PeeringPoint
@@ -357,7 +354,6 @@ class PeeringPoint:
     def __init__(self, afi):
         self.local_ip = ""
         self.remote_ip = ""
-        self.afi = afi
         self.actions_in = PolicyActionList('import')
         self.actions_out = PolicyActionList('export')
 
@@ -389,7 +385,7 @@ class PeerObjDir:
             return self.peerTable[asnum]
         else:
             "TODO: Make it custom error"
-            raise Exception('Peer AS does not exist')
+            raise errors.ASDiscoveryError('Peer AS does not exist')
 
     def enumerateObjs(self):
         for k in self.peerTable.keys():
@@ -397,8 +393,9 @@ class PeerObjDir:
 
 
 class peerFilter:
-    def __init__(self, hv, expr):
+    def __init__(self, hv, afi, expr):
         self.hashValue = hv
+        self.afi = afi
         self.expression = expr
         self.statements = ""
 

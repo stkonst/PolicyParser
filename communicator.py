@@ -3,6 +3,8 @@ import logging
 
 import requests
 
+import errors
+
 
 class Communicator:
     def __init__(self, db_url, source, alternatives):
@@ -24,10 +26,12 @@ class Communicator:
         try:
             db_reply = self._sendDbRequest(self._searchURLbuilder(autnum, None, (), ('r')))
             logging.debug("Policy received for %s" % autnum)
-        except:
-            logging.error("Failed to receive policy for %s" % autnum)
+        except errors.RIPEDBError:
+            logging.error("Failed to receive policy for %s due to RIPE DB error." % autnum)
             pass
-
+        except errors.SendRequestError as e:
+            logging.error('Get policy failed. %s' % e)
+            pass
         return db_reply
 
     def getFilterSet(self, value):
@@ -37,8 +41,11 @@ class Communicator:
         db_reply = None
         try:
             db_reply = self._sendDbRequest(self._searchURLbuilder(value, None, (), ('r')))
-        except Exception as e:
-            logging.error('Get Filter failed for %s. %s ' % (value, e))
+        except errors.RIPEDBError:
+            logging.error('Get Filter failed for %s due to RIPE DB error.' % value)
+            pass
+        except errors.SendRequestError as e:
+            logging.error('Get all routes failed for %s. %s' % (value, e))
             pass
         return db_reply
 
@@ -52,7 +59,10 @@ class Communicator:
 
         try:
             db_reply = self._sendDbRequest(url)
-        except Exception as e:
+        except errors.RIPEDBError:
+            logging.error('Get all routes failed for %s due to RIPE DB error' % autnum)
+            pass
+        except errors.SendRequestError as e:
             logging.error('Get all routes failed for %s. %s' % (autnum, e))
             pass
         return db_reply
@@ -84,25 +94,26 @@ class Communicator:
             headers = {'Accept': 'application/xml'}
             r = self.session.get(db_url, headers=headers)
             if r.status_code == 200:
-                return r.text.encode(encoding='utf-8')
+                # return r.text.encode(encoding='utf-8')
+                return r.content
             elif r.status_code == 400:
                 logging.warning("RIPE-API: The service is unable to understand and process the request.")
-                raise Exception("RIPE-API_ERROR_400")
+                raise errors.RIPEDBError("RIPE-API_ERROR_400")
             elif r.status_code == 403:
                 logging.warning("RIPE-API: Query limit exceeded.")
-                raise Exception("RIPE-API_ERROR_403")
+                raise errors.RIPEDBError("RIPE-API_ERROR_403")
             elif r.status_code == 404:
                 logging.warning("RIPE-API: No Objects found")
-                raise Exception("RIPE-API_ERROR_404")
+                raise errors.RIPEDBError("RIPE-API_ERROR_404")
             elif r.status_code == 409:
                 logging.warning("RIPE-API: Integrity constraint violated")
-                raise Exception("RIPE-API_ERROR_409")
+                raise errors.RIPEDBError("RIPE-API_ERROR_409")
             elif r.status_code == 500:
                 logging.warning("RIPE-API: Internal Server Error")
-                raise Exception("RIPE-API_ERROR_500")
+                raise errors.RIPEDBError("RIPE-API_ERROR_500")
             else:
                 logging.warning("Unknown RIPE-API response (%s)" % r.status_code)
-                raise Exception("RIPE-API_ERROR_UNKNOWN")
+                raise errors.RIPEDBError("RIPE-API_ERROR_UNKNOWN")
         except:
             # dunno, we got another type of Error
-            raise
+            raise errors.SendRequestError

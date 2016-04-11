@@ -20,3 +20,27 @@ class UnsupportedAFIerror(Error):
 
 class IPparseError(Error):
     pass
+
+
+class RIPEDBError(Error):
+    pass
+
+
+class SendRequestError(Error):
+    pass
+
+
+class AppendFilterError(Error):
+    pass
+
+
+class ASDiscoveryError(Error):
+    pass
+
+
+class InterpreterError(Error):
+    pass
+
+
+class ASNParserError(Error):
+    pass

@@ -16,11 +16,11 @@ alternative_db_sources = ("RADB-GRS", "APNIC-GRS", "ARIN-GRS", "LACNIC-GRS", "AF
 params = dict()
 
 
-def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
+def buildXMLpolicy(autnum, ipv6=True, output='screen'):
 
     """ PreProcess section: Get own policy, parse and create necessary Data Structures """
     com = communicator.Communicator(ripe_db_url, default_db_source, alternative_db_sources)
-    pp = parsers.PolicyParser(autnum, ipv4, ipv6)
+    pp = parsers.PolicyParser(autnum)
 
     pp.assignContent(com.getPolicyByAutnum(autnum))
     pp.readPolicy()
@@ -37,7 +37,7 @@ def buildXMLpolicy(autnum, ipv4=True, ipv6=True, output='screen'):
     """ PostProcess: Create and deliver the corresponding XML output """
     com.session.close()
 
-    xmlgen = xmlGenerator.xmlGenerator(autnum, ipv4, ipv6)
+    xmlgen = xmlGenerator.xmlGenerator(autnum)
 
     xmlgen.convertPeersToXML(pp.peerings)
     xmlgen.convertFiltersToXML(pp.fltrExpressions)
@@ -69,9 +69,6 @@ if __name__ == "__main__":
                     exit(1)
             if arg == "-o":
                 params["output_file"] = sys.argv[sys.argv.index('-o') + 1]
-
-            if arg == "-4":
-                params["ipv4"] = "True"
 
             if arg == "-6":
                 params["ipv6"] = "True"

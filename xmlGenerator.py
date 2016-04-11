@@ -4,11 +4,10 @@ import datetime
 
 
 class xmlGenerator:
-    def __init__(self, autnum, ipv4=True, ipv6=True):
+    def __init__(self, autnum):
         self.autnum = autnum
         self.xml_policy = self.getPolicyTemplate(self.autnum)  # Init XML Template
-        self.ipv4_enabled = ipv4
-        self.ipv6_enabled = ipv6
+        # self.ipv6_enabled = ipv6
 
     def _getActionTemplate(self, PolicyActionList):
 
@@ -66,7 +65,7 @@ class xmlGenerator:
 
     def _filterToXML(self, peerFilter):
 
-        fltr_root = et.Element('peering-filter', attrib={"hash-value": peerFilter.hashValue})
+        fltr_root = et.Element('peering-filter', attrib={"hash-value": peerFilter.hashValue, "afi": peerFilter.afi})
         et.SubElement(fltr_root, "expression").text = peerFilter.expression
         statement_root = et.SubElement(fltr_root, "statements")
 
@@ -120,7 +119,7 @@ class xmlGenerator:
     def _peeringPointToXML(self, points_root, PeeringPoint):
 
         if PeeringPoint.getKey() is not "|":
-            pp_root = et.Element('peering-point', attrib={"afi": PeeringPoint.afi})
+            pp_root = et.Element('peering-point')
 
             p = et.SubElement(pp_root, "point",
                               attrib={"local-IP": PeeringPoint.local_ip, "remote-IP": PeeringPoint.remote_ip})
@@ -139,26 +138,25 @@ class xmlGenerator:
 
         points = et.SubElement(template_root, 'peering-points')
         for pp in PeerAS.peeringPoints.itervalues():
-            # points.append(self._peeringPointToXML(pp))
             self._peeringPointToXML(points, pp)
 
-        if self.ipv4_enabled:
-            im = et.SubElement(template_root, 'imports')
-            ex = et.SubElement(template_root, 'exports')
-            for f, v in PeerAS.v4Filters.iteritems():
-                if v[0] == "import":
-                    im.append(self._getFilterTemplate(f))
-                if v[0] == "export":
-                    ex.append(self._getFilterTemplate(f))
+        im = et.SubElement(template_root, 'imports')
+        ex = et.SubElement(template_root, 'exports')
 
-        if self.ipv6_enabled:
-            im = et.SubElement(template_root, 'mp-imports')
-            ex = et.SubElement(template_root, 'mp-exports')
-            for f, v in PeerAS.v4Filters.iteritems():
-                if v[0] == "import":
-                    im.append(self._getFilterTemplate(f))
-                if v[0] == "export":
-                    ex.append(self._getFilterTemplate(f))
+        for f, v in PeerAS.filters.iteritems():
+            if v == "import":
+                im.append(self._getFilterTemplate(f))
+            if v == "export":
+                ex.append(self._getFilterTemplate(f))
+
+        im = et.SubElement(template_root, 'mp-imports')
+        ex = et.SubElement(template_root, 'mp-exports')
+
+        for f, v in PeerAS.mp_filters.iteritems():
+            if v == "import":
+                im.append(self._getFilterTemplate(f))
+            if v == "export":
+                ex.append(self._getFilterTemplate(f))
 
         return template_root
 

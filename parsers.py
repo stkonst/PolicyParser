@@ -37,17 +37,14 @@ ACTION_ASPATH_PREPEND = re.compile('prepend\((.*)\)', re.I)
 
 EXTRACT_ACTIONS_EXPORT = re.compile('ACTION(.*)ANNOUNCE', re.I)
 EXTRACT_ACTIONS_IMPORT = re.compile('ACTION(.*)ACCEPT', re.I)
-# EXTACT_IPS_V4 = re.compile('\s\w*\s([0-9\.]+)\sAT?\s?([0-9\.]*)', re.I)
-# EXTACT_IPS_V6 = re.compile('\s\w*\s([0-9a-z:]+)\sAT?\s?([0-9a-z:]*)', re.I)
+
 IP_EXTRACT_RE = re.compile("(?P<afi>AFI\s\w*\.\w*)?\s?(FROM|TO)\sAS(?:\d*)\s(?P<remote>\S*)\sAT\s(?P<local>\S*)", re.I)
 
 
 class PolicyParser:
-    def __init__(self, autnum, ipv4=True, ipv6=True):
+    def __init__(self, autnum):
         self.etContent = et.ElementTree()
         self.autnum = autnum
-        self.ipv4_enabled = ipv4
-        self.ipv6_enabled = ipv6
         self.peerings = rpsl.PeerObjDir()
         self.fltrExpressions = rpsl.peerFilterDir()
 
@@ -65,8 +62,7 @@ class PolicyParser:
                 try:
                     self.interpreter(elem.attrib.get("value").upper(), mp=False, rule="import")
 
-                except:
-                    "TODO: Catch a custom error"
+                except errors.InterpreterError:
                     logging.warning("Failed to parse import {%s}" % elem.attrib.get("value"))
                     pass
 
@@ -74,8 +70,7 @@ class PolicyParser:
                 try:
                     self.interpreter(elem.attrib.get("value").upper(), mp=False, rule="export")
 
-                except:
-                    "TODO: Catch a custom error"
+                except errors.InterpreterError:
                     logging.warning("Failed to parse export {%s}" % elem.attrib.get("value"))
                     pass
 
@@ -83,8 +78,7 @@ class PolicyParser:
                 try:
                     self.interpreter(elem.attrib.get("value").upper(), mp=True, rule="import")
 
-                except:
-                    "TODO: Catch a custom error"
+                except errors.InterpreterError:
                     logging.warning("Failed to parse mp-import {%s}" % elem.attrib.get("value"))
                     pass
 
@@ -92,8 +86,7 @@ class PolicyParser:
                 try:
                     self.interpreter(elem.attrib.get("value").upper(), mp=True, rule="export")
 
-                except:
-                    "TODO: Catch a custom error"
+                except errors.InterpreterError:
                     logging.warning("Failed to parse mp-export {%s}" % elem.attrib.get("value"))
                     pass
 
@@ -267,7 +260,7 @@ class PolicyParser:
 
         return (direction, afi, [self.normalizeFactor(f, factors[1]) for f in factors[0]])
 
-    def interpreter(self, mytext, rule, mp=False, ipv6=False):
+    def interpreter(self, mytext, rule, mp=False):
         """
         Analyse and interpret the rule.
 
@@ -285,17 +278,16 @@ class PolicyParser:
 
         try:
             peer_as = self.peerings.returnPeering(res[2][0][0])
-        except Exception:
-            "TODO: Catch a custom exception"
+        except errors.ASDiscoveryError:
             peer_as = rpsl.PeerAS(res[2][0][0])
             # logging.debug('New peering found (%s)' % res[2][0][0])
             pass
 
         # Check address family matches
-        if res[1] != 'ANY' and res[1] != 'ANY.UNICAST':
-            if ((ipv6 and res[1] != 'IPV6.UNICAST') or
-                    ((not ipv6) and res[1] != 'IPV4.UNICAST')):
-                return
+        # if res[1] != 'ANY' and res[1] != 'ANY.UNICAST':
+        #     if ((ipv6 and res[1] != 'IPV6.UNICAST') or
+        #             ((not ipv6) and res[1] != 'IPV4.UNICAST')):
+        #         raise errors.InterpreterError("AFI does not match.")
 
         """
             Separation of roles. The peer class will get a pointer to the filter (hash value)
@@ -305,14 +297,17 @@ class PolicyParser:
             # Create a hash of the filter expression
             ha = str(xxhash.xxh64(res[2][0][1]).hexdigest())
 
-            pf = rpsl.peerFilter(ha, res[2][0][1])
+            # The actual peer filter is constructed and stored here.
+            pf = rpsl.peerFilter(ha, res[1], res[2][0][1])
             self.fltrExpressions.appendFilter(pf)
 
-            # Append in the peer a filter set(direction, afi, hash)
+            # Append in the peer the filter set(direction, afi, hash)
             try:
                 peer_as.appendFilter((res[0], res[1], ha), mp)  # !!!!!!!!!!!!!
-            except errors.UnsupportedAFIerror:
-                logging.warning("Failed to append filter %s on peer %s" % (ha, peer_as.origin))
+            except errors.AppendFilterError:
+                # logging.warning("Failed to append filter %s on peer %s" % (ha, peer_as.origin))
+                raise errors.InterpreterError("Failed to append filter for peer %s."
+                                              % peer_as.origin)
 
         pp = rpsl.PeeringPoint(res[1])
         if re.search('\sAT\s', mytext, re.I):
@@ -357,8 +352,10 @@ class ASNParser:
                     new_prefix = subelem.attrib.get("value")
                 for subelem in elem.iterfind('./attribute[@name="origin"]'):
                     new_origin = subelem.attrib.get("value")
-                if new_prefix is not None or new_origin is not None:
+                if new_prefix is not None and new_origin is not None:
                     self.ASNobj.routeObjDir.appendRouteObj(rpsl.RouteObject(new_prefix, new_origin))
+                else:
+                    raise errors.ASNParserError("Prefix or Origin could not be found")
 
         if self.ipv6:
             for elem in db_object.iterfind('./objects/object[@type="route6"]/primary-key'):
@@ -369,8 +366,9 @@ class ASNParser:
                 for subelem in elem.iterfind('./attribute[@name="origin"]'):
                     new_origin = subelem.attrib.get("value")
                 if new_prefix is not None and new_origin is not None:
-                    if new_prefix is not None or new_origin is not None:
-                        self.ASNobj.routeObjDir.appendRouteObj(rpsl.Route6Object(new_prefix, new_origin))
+                    self.ASNobj.routeObjDir.appendRouteObj(rpsl.Route6Object(new_prefix, new_origin))
+                else:
+                    raise errors.ASNParserError("Prefix or Origin could not be found")
 
 
 class ASSetParser:
@@ -433,6 +431,7 @@ class RSSetParser:
                         self.setObj.members.appendRouteObj(ro)
 
         if self.ipv6_enabled:
+            # WROOONG IPv6 is not MP
             for elem in db_object.iterfind('./objects/object[@type="route-set"]/attributes'):
                 for subelem in elem.iterfind('./attribute[@name="mp-members"]'):
                     new_member = subelem.attrib.get("value").strip()
