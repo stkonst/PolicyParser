@@ -10,51 +10,51 @@ ASN_MATCH = re.compile('^AS[0-9]+$')
 PFX_FLTR_MATCH = re.compile('^\{([^}]*)\}(\^[0-9+-]+)?$')
 PFX_MATCH = re.compile('^([0-9A-F:\.]+/[0-9]+)(\^[0-9+-]+)?$')
 PFX_RANGE_OPERATOR = re.compile('^\^[0-9+-]+$')
-AS_SET_MATCH = re.compile('^(AS\d+:)*AS-(\w|-)+$')
-RS_SET_MATCH = re.compile('^RS-(\w|-)+$')
-RTR_SET_MATCH = re.compile('^RTR-(\w|-)+$')
-FLTR_SET_MATCH = re.compile('^FLTR-(\w|-)+$')
+AS_SET_MATCH = re.compile('^(?:AS\d+:)*(?:AS-(?:\w|-)+:?)+(?::AS\d+)*$')
+RS_SET_MATCH = re.compile('^(?:AS\d+:)*(?:RS-(?:\w|-)+:?)+(?::AS\d+)*$')
+RTR_SET_MATCH = re.compile('^(?:AS\d+:)*(?:RTR-(?:\w|-)+:?)+(?::AS\d+)*$')
+FLTR_SET_MATCH = re.compile('^(?:AS\d+:)*(?:FLTR-(?:\w|-)+:?)+(?::AS\d+)*$')
 
 
 regex_ops = '(?:(?:\?|~?(?:\*|\+)?)|~?\{\d+(?:,\d*)?\})?'
-AS_PATH_MEMBER_MATCH = [ # ASN with regex operators
-                        re.compile("^\^?{asn}{regexops}\$?$".format(asn='AS[0-9]+',regexops=regex_ops)),
+AS_PATH_MEMBER_MATCH = [  # ASN with regex operators
+                        re.compile("^\^?{asn}{regexops}\$?$".format(asn='AS[0-9]+', regexops=regex_ops)),
                         # AS_SET with regex operators
-                        re.compile("^\^?{as_set}{regexops}\$?$".format(as_set='(AS\d+:)*AS-(\w|-)*',regexops=regex_ops)),
+                        re.compile("^\^?{as_set}{regexops}\$?$".format(as_set='(?:AS\d+:)*(?:AS-(?:\w|-)+:?)+(?::AS\d+)*', regexops=regex_ops)),
                         # '.' with regex operators
-                        re.compile("^\^?\.{regexops}\$?$".format(regexops=regex_ops)),]
+                        re.compile("^\^?\.{regexops}\$?$".format(regexops=regex_ops)), ]
 
 
 def is_ASN(value):
-    return ASN_MATCH.match(str(value).strip()) != None
+    return ASN_MATCH.match(str(value).strip()) is not None
 
 
 def is_pfx_filter(value):
-    return PFX_FLTR_MATCH.match(value) != None
+    return PFX_FLTR_MATCH.match(value) is not None
 
 
 def is_pfx(value):
-    return PFX_MATCH.match(value) != None
+    return PFX_MATCH.match(value) is not None
 
 
 def is_pfx_range_operator(value):
-    return PFX_RANGE_OPERATOR.match(value) != None
+    return PFX_RANGE_OPERATOR.match(value) is not None
 
 
 def is_AS_set(value):
-    return AS_SET_MATCH.match(value) != None
+    return AS_SET_MATCH.match(value) is not None
 
 
 def is_rtr_set(value):
-    return RTR_SET_MATCH.match(value) != None
+    return RTR_SET_MATCH.match(value) is not None
 
 
 def is_rs_set(value):
-    return RS_SET_MATCH.match(value) != None
+    return RS_SET_MATCH.match(value) is not None
 
 
 def is_fltr_set(value):
-    return FLTR_SET_MATCH.match(value) != None
+    return FLTR_SET_MATCH.match(value) is not None
 
 
 def is_as_path_member(value):
@@ -132,15 +132,11 @@ class RouteObjectDir(object):
         else:
             raise errors.AppendFilterError('Failed to insert Route object to dictionary')
 
-    def checkRouteExists(self, route, v6=False):
-        if v6:
-            if self.originTableV6.has_key(route):
-                return True
-            return False
-        else:
-            if self.originTable.has_key(route):
-                return True
-            return False
+    # def checkRouteExists(self, route, v6=False):
+    #     if v6:
+    #         return route in self.originTableV6
+    #     else:
+    #         return route in self.originTable
 
 
 class ASNObject(RpslObject):
@@ -150,6 +146,7 @@ class ASNObject(RpslObject):
 
     def __init__(self, asnum):
         self.origin = asnum
+        # self.hash = hv
         self.routeObjDir = RouteObjectDir()
 
     def getKey(self):
@@ -161,15 +158,11 @@ class ASNObject(RpslObject):
     def appendRouteObj(self, RouteObject):
         self.routeObjDir[RouteObject.getKey()] = RouteObject
 
-    def ASN_has_route(self, RouteObject, v6=False):
-        if v6:
-            if self.routeObjDir.originTableV6.has_key(RouteObject.getKey()):
-                return True
-            return False
-        else:
-            if self.routeObjDir.originTable.has_key(RouteObject.getKey()):
-                return True
-            return False
+    # def ASN_has_route(self, RouteObject, v6=False):
+    #     if v6:
+    #         return RouteObject.getKey() in self.routeObjDir.originTableV6
+    #     else:
+    #         return RouteObject.getKey() in self.routeObjDir.originTable
 
 
 class ASNObjectDir:
@@ -213,6 +206,7 @@ class AsSetObject(RpslObject):
     def __init__(self, setname):
         RpslObject.__init__(self)
         self.as_set = setname
+        # self.hash = hv
         self.ASNmembers = set()
         self.ASSetmember = set()
 
@@ -230,10 +224,8 @@ class AsSetObjectDir:
     def appendAsSetObj(self, AsSetObject):
         self.asSetObjDir[AsSetObject.getKey()] = AsSetObject
 
-    def checkAsSetExists(self, AsSetObject):
-        if AsSetObject.getKey() in self.asSetObjDir.keys():
-            return True
-        return False
+    # def checkAsSetExists(self, AsSetObject):
+    #     return AsSetObject.getKey() in self.asSetObjDir
 
 
 class PeeringSetObject(RpslObject):
@@ -295,6 +287,7 @@ class RouteSetObject(RpslObject):
     def __init__(self, setname):
         RpslObject.__init__(self)
         self.route_set = setname
+        # self.hash = hv
         self.members = RouteObjectDir()
         self.mp_members = RouteObjectDir()
         self.RSSetsDir = set()
@@ -338,16 +331,14 @@ class PeerAS:
         else:
             self.filters[info[2]] = info[0]
 
-    def appendPeeringPoint(self, PeeringPoint):
-        self.peeringPoints[PeeringPoint.getKey()] = PeeringPoint
+    def appendPeeringPoint(self, peering_point):
+        self.peeringPoints[peering_point.getKey()] = peering_point
 
     def returnPeeringPoint(self, pkey):
         return self.peeringPoints[pkey]
 
     def checkPeeringPointKey(self, pkey):
-        if pkey in self.peeringPoints:
-            return True
-        return False
+        return pkey in self.peeringPoints
 
 
 class PeeringPoint:
@@ -388,8 +379,8 @@ class PeerObjDir:
             raise errors.ASDiscoveryError('Peer AS does not exist')
 
     def enumerateObjs(self):
-        for k in self.peerTable.keys():
-            yield self.peerTable[k]
+        for k in self.peerTable.itervalues():
+            yield k
 
 
 class peerFilter:
@@ -414,8 +405,8 @@ class peerFilterDir:
         return self.filterTable[hashVal]
 
     def number_of_filters(self):
-        return len(self.filterTable.keys())
+        return len(self.filterTable)
 
     def enumerateObjs(self):
-        for k in self.filterTable.keys():
-            yield self.filterTable[k]
+        for k in self.filterTable.itervalues():
+            yield k

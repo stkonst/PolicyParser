@@ -1,6 +1,7 @@
 __author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl)'
 import xml.etree.ElementTree as et
 import datetime
+from collections import deque
 
 
 class xmlGenerator:
@@ -95,26 +96,50 @@ class xmlGenerator:
             et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
 
     def _RouteSetToXML(self, RouteSetObject, RouteSetObjectdir, pl):
+        """Traverses the tree created by the RSes. Ignores duplicate routes and avoids loops."""
+        route_set_tree = deque([RouteSetObject.getKey()])
+        traversed_route_sets = set()
+        traversed_routes = set()
 
-        for r in RouteSetObject.members.originTable.itervalues():
-            et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+        while route_set_tree:
+            current_set_name = route_set_tree.popleft()
+            current_set = RouteSetObjectdir.RouteSetObjDir[current_set_name]
+            for r in current_set.members.originTable.itervalues():
+                if r.route not in traversed_routes:
+                    et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+                    traversed_routes.add(r.route)
 
-        for r in RouteSetObject.mp_members.originTableV6.itervalues():
-            et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+            for r in current_set.mp_members.originTableV6.itervalues():
+                if r.route not in traversed_routes:
+                    et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+                    traversed_routes.add(r.route)
 
-        for t in RouteSetObject.RSSetsDir:
-            self._RouteSetToXML(RouteSetObjectdir.RouteSetObjDir[t], RouteSetObjectdir, pl)
+            for child_set in current_set.RSSetsDir:
+                if child_set not in traversed_route_sets:
+                    traversed_route_sets.add(child_set)
+                    route_set_tree.extend(child_set)
 
     def _ASSETtoXML(self, AsSetObject, ASNObjectDir, AsSetObjectDir, pl_root):
+        """Traverses the tree created by the AS sets. Ignores duplicate ASes and avoids loops."""
+        AS_set_tree = deque([AsSetObject.getKey()])
+        traversed_AS_sets = set()
+        traversed_ASes = set()
 
-        for m in AsSetObject.ASNmembers:
-            try:
-                self._AStoXML(ASNObjectDir.asnObjDir[m], pl_root)
-            except KeyError:
-                pass
+        while AS_set_tree:
+            current_set_name = AS_set_tree.popleft()
+            current_set = AsSetObjectDir.asSetObjDir[current_set_name]
+            for child_AS in current_set.ASNmembers:
+                if child_AS not in traversed_ASes:
+                    traversed_ASes.add(child_AS)
+                    try:
+                        self._AStoXML(ASNObjectDir.asnObjDir[child_AS], pl_root)
+                    except KeyError:
+                        pass
 
-        for t in AsSetObject.ASSetmember:
-            self._ASSETtoXML(AsSetObjectDir.asSetObjDir[t], ASNObjectDir, AsSetObjectDir, pl_root)
+            for child_set in current_set.ASSetmember:
+                if child_set not in traversed_AS_sets:
+                    traversed_AS_sets.add(child_set)
+                    AS_set_tree.extend(child_set)
 
     def _peeringPointToXML(self, points_root, PeeringPoint):
 
