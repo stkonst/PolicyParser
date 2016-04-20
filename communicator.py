@@ -1,4 +1,3 @@
-__author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl)'
 import logging
 
 import requests
@@ -25,12 +24,12 @@ class Communicator:
         db_reply = None
         try:
             db_reply = self._sendDbRequest(self._searchURLbuilder(autnum, None, (), ('r')))
-            logging.debug("Policy received for %s" % autnum)
+            logging.debug("Policy received for {}".format(autnum))
         except errors.RIPEDBError:
-            logging.error("Failed to receive policy for %s due to RIPE DB error." % autnum)
+            logging.error("Failed to receive policy for {} due to RIPE DB error.".format(autnum))
             pass
         except errors.SendRequestError as e:
-            logging.error('Get policy failed. %s' % e)
+            logging.error('Get policy failed. {}'.format(e))
             pass
         return db_reply
 
@@ -42,10 +41,10 @@ class Communicator:
         try:
             db_reply = self._sendDbRequest(self._searchURLbuilder(value, None, (), ('r')))
         except errors.RIPEDBError:
-            logging.error('Get Filter failed for %s due to RIPE DB error.' % value)
+            logging.error('Get Filter failed for {} due to RIPE DB error.'.format(value))
             pass
         except errors.SendRequestError as e:
-            logging.error('Get all routes failed for %s. %s' % (value, e))
+            logging.error('Get all routes failed for {}. {}'.format(value, e))
             pass
         return db_reply
 
@@ -60,10 +59,10 @@ class Communicator:
         try:
             db_reply = self._sendDbRequest(url)
         except errors.RIPEDBError:
-            logging.error('Get all routes failed for %s due to RIPE DB error' % autnum)
+            logging.error('Get all routes failed for {} due to RIPE DB error'.format(autnum))
             pass
         except errors.SendRequestError as e:
-            logging.error('Get all routes failed for %s. %s' % (autnum, e))
+            logging.error('Get all routes failed for {}. {}'.format(autnum, e))
             pass
         return db_reply
 
@@ -73,17 +72,17 @@ class Communicator:
             http://rest.db.ripe.net/search.xml?query-string=as199664&type-filter=route6&inverse-attribute=origin
         """
 
-        new_url = "/search.xml?query-string=%s&source=%s" % (query_string, self.source)
+        new_url = "/search.xml?query-string={}&source={}".format(query_string, self.source)
         new_url += self.other_sources
 
         if inverse_attribute is not None:
-            new_url += "&inverse-attribute=%s" % inverse_attribute
+            new_url += "&inverse-attribute={}".format(inverse_attribute)
 
         for f in type_filters:
-            new_url += "&type-filter=%s" % f
+            new_url += "&type-filter={}".format(f)
 
         for f in flags:
-            new_url += "&flags=%s" % f
+            new_url += "&flags={}".format(f)
 
         return self.db_url + new_url
 

@@ -1,4 +1,3 @@
-__author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl)'
 import sys
 import logging
 from xml.dom.minidom import parseString
@@ -10,10 +9,20 @@ import resolvers
 import xmlGenerator
 
 help_message = "Please run again by typing parser -a <ASXXX>"
-ripe_db_url = "https://rest.db.ripe.net"
+ripe_db_url = "http://rest.db.ripe.net"
 default_db_source = "ripe"
 alternative_db_sources = ("RADB-GRS", "APNIC-GRS", "ARIN-GRS", "LACNIC-GRS", "AFRINIC-GRS")
 params = dict()
+black_list = set()
+
+
+def read_blisted(as_list):
+    items = set(as_list.split(","))
+    for i in items:
+        if not rpsl.is_ASN(i):
+            print "{} is not a valid AS number".format(i)
+            exit(1)
+    return items
 
 
 def buildXMLpolicy(autnum, ipv6=True, output='screen'):
@@ -24,14 +33,14 @@ def buildXMLpolicy(autnum, ipv6=True, output='screen'):
 
     pp.assignContent(com.getPolicyByAutnum(autnum))
     pp.readPolicy()
-    logging.debug("Found %s expressions to resolve" % pp.fltrExpressions.number_of_filters())
+    logging.debug("Found {} expressions to resolve".format(pp.fltrExpressions.number_of_filters()))
 
     """
         Process section: Resolve necessary fltrExpressions into prefixes
         Maybe use Multithreading to fetch necessary info from RIPE DB.
     """
 
-    fr = resolvers.filterResolver(pp.fltrExpressions, com, ipv6)
+    fr = resolvers.filterResolver(pp.fltrExpressions, com, ipv6, black_list)
     fr.resolveFilters()
 
     """ PostProcess: Create and deliver the corresponding XML output """
@@ -55,7 +64,7 @@ def buildXMLpolicy(autnum, ipv6=True, output='screen'):
 if __name__ == "__main__":
     starting_flag = True
     if len(sys.argv) < 2:
-        print "\nIncomplete number of parameters. \n%s\n" % help_message
+        print "\nIncomplete number of parameters. \n{}\n".format(help_message)
         starting_flag = False
 
     else:
@@ -72,6 +81,10 @@ if __name__ == "__main__":
 
             if arg == "-6":
                 params["ipv6"] = "True"
+
+            if arg == "-b":
+                # Comma seperated list of AS numbers that we don't want to resolve (blacklisted)
+                black_list = read_blisted(sys.argv[sys.argv.index('-b') + 1])
 
     print("Configuration done. Starting...")
 

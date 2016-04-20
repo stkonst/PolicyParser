@@ -1,5 +1,3 @@
-__author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl) '
-__author__ += 'Tomas Hlavacek (tmshlvck@gmail.com) '
 import re
 
 import errors
@@ -18,7 +16,7 @@ FLTR_SET_MATCH = re.compile('^(?:AS\d+:)*(?:FLTR-(?:\w|-)+:?)+(?::AS\d+)*$')
 
 regex_ops = '(?:(?:\?|~?(?:\*|\+)?)|~?\{\d+(?:,\d*)?\})?'
 AS_PATH_MEMBER_MATCH = [  # ASN with regex operators
-                        re.compile("^\^?{asn}{regexops}\$?$".format(asn='AS[0-9]+', regexops=regex_ops)),
+                          re.compile("^\^?{asn}{regexops}\$?$".format(asn='[[^]{0,2}AS[0-9]+\]?', regexops=regex_ops)),
                         # AS_SET with regex operators
                         re.compile("^\^?{as_set}{regexops}\$?$".format(as_set='(?:AS\d+:)*(?:AS-(?:\w|-)+:?)+(?::AS\d+)*', regexops=regex_ops)),
                         # '.' with regex operators
@@ -146,7 +144,6 @@ class ASNObject(RpslObject):
 
     def __init__(self, asnum):
         self.origin = asnum
-        # self.hash = hv
         self.routeObjDir = RouteObjectDir()
 
     def getKey(self):
@@ -183,7 +180,7 @@ class PolicyAction:
         self.rp_value = val
 
     def __str__(self):
-        return '%s%s%s' % (self.rp_attr, self.rp_operator, self.rp_value)
+        return '{}{}{}'.format(self.rp_attr, self.rp_operator, self.rp_value)
 
 
 class PolicyActionList:
@@ -206,7 +203,6 @@ class AsSetObject(RpslObject):
     def __init__(self, setname):
         RpslObject.__init__(self)
         self.as_set = setname
-        # self.hash = hv
         self.ASNmembers = set()
         self.ASSetmember = set()
 
@@ -214,7 +210,7 @@ class AsSetObject(RpslObject):
         return self.as_set
 
     def __str__(self):
-        return 'AsSetObject: %s ' % self.as_set
+        return 'AsSetObject: {} '.format(self.as_set)
 
 
 class AsSetObjectDir:
@@ -223,9 +219,6 @@ class AsSetObjectDir:
 
     def appendAsSetObj(self, AsSetObject):
         self.asSetObjDir[AsSetObject.getKey()] = AsSetObject
-
-    # def checkAsSetExists(self, AsSetObject):
-    #     return AsSetObject.getKey() in self.asSetObjDir
 
 
 class PeeringSetObject(RpslObject):
@@ -245,7 +238,7 @@ class PeeringSetObject(RpslObject):
         return self.peering_set
 
     def __str__(self):
-        return 'PeeringSetObject: %s -< %s mp: %s' % (self.peering_set, str(self.peering), str(self.mp_peering))
+        return 'PeeringSetObject: {} -< {} mp: {}'.format(self.peering_set, str(self.peering), str(self.mp_peering))
 
 
 class FilterSetObject(RpslObject):
@@ -274,7 +267,7 @@ class FilterSetObject(RpslObject):
             else:
                 f = ''
             f += str(self.mp_filter)
-        return 'FilterSetbject: %s -< %s' % (self.filter_set, f)
+        return 'FilterSetbject: {} -< {}'.format(self.filter_set, f)
 
 
 class RouteSetObject(RpslObject):
@@ -287,7 +280,6 @@ class RouteSetObject(RpslObject):
     def __init__(self, setname):
         RpslObject.__init__(self)
         self.route_set = setname
-        # self.hash = hv
         self.members = RouteObjectDir()
         self.mp_members = RouteObjectDir()
         self.RSSetsDir = set()
@@ -296,7 +288,7 @@ class RouteSetObject(RpslObject):
         return self.route_set
 
     def __str__(self):
-        return 'RouteSetbject: %s ' % self.route_set
+        return 'RouteSetbject: {} '.format(self.route_set)
 
 
 class RouteSetObjectdir:
@@ -342,7 +334,7 @@ class PeerAS:
 
 
 class PeeringPoint:
-    def __init__(self, afi):
+    def __init__(self):
         self.local_ip = ""
         self.remote_ip = ""
         self.actions_in = PolicyActionList('import')
@@ -361,7 +353,7 @@ class PeeringPoint:
         return str(self.local_ip) + "|" + str(self.remote_ip)
 
     def __str__(self):
-        return "Local_IP: %s Remote_IP: %s" % (self.local_ip, self.remote_ip)
+        return "Local_IP: {} Remote_IP: {}".format(self.local_ip, self.remote_ip)
 
 
 class PeerObjDir:
@@ -375,7 +367,6 @@ class PeerObjDir:
         if asnum in self.peerTable.keys():
             return self.peerTable[asnum]
         else:
-            "TODO: Make it custom error"
             raise errors.ASDiscoveryError('Peer AS does not exist')
 
     def enumerateObjs(self):

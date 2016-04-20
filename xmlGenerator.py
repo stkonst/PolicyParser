@@ -1,4 +1,3 @@
-__author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl)'
 import xml.etree.ElementTree as et
 import datetime
 from collections import deque
@@ -8,7 +7,6 @@ class xmlGenerator:
     def __init__(self, autnum):
         self.autnum = autnum
         self.xml_policy = self.getPolicyTemplate(self.autnum)  # Init XML Template
-        # self.ipv6_enabled = ipv6
 
     def _getActionTemplate(self, PolicyActionList):
 
@@ -20,11 +18,11 @@ class xmlGenerator:
         while PolicyActionList.actionDir:
             i, ac = PolicyActionList.actionDir.popitem()
             if ac.rp_operator == "append":
-                new_actions.set(ac.rp_attr.lower(), "append(%s)" % ac.rp_value)
+                new_actions.set(ac.rp_attr.lower(), "append({})".format(ac.rp_value))
             elif ac.rp_operator == "delete":
-                new_actions.set(ac.rp_attr.lower(), "delete(%s)" % ac.rp_value)
+                new_actions.set(ac.rp_attr.lower(), "delete({})".format(ac.rp_value))
             elif ac.rp_operator == "prepend":
-                new_actions.set(ac.rp_attr.lower(), "prepend(%s)" % ac.rp_value)
+                new_actions.set(ac.rp_attr.lower(), "prepend({})".format(ac.rp_value))
             elif ac.rp_operator == "=":
                 new_actions.set(ac.rp_attr.lower(), ac.rp_value)
 
@@ -53,7 +51,7 @@ class xmlGenerator:
 
         template_root = et.Element('root')
 
-        template_root.append(et.Comment('This is a resolved XML policy file for ' + autnum))
+        template_root.append(et.Comment('This is a resolved XML policy file for {}'.format(autnum)))
         et.SubElement(template_root, 'datetime').text = str(datetime.datetime.now())
 
         et.SubElement(template_root, 'prefix-lists')

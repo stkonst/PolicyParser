@@ -1,6 +1,5 @@
-__author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl) '
 import logging
-import xml.etree.ElementTree as et
+import xml.etree.cElementTree as et
 
 import rpsl
 import analyzer
@@ -10,11 +9,12 @@ depth_limit = 15
 
 
 class filterResolver:
-    def __init__(self, items, Communicator, ipv6_enabled):
+    def __init__(self, items, Communicator, ipv6_enabled, blist):
 
         self.peerFilters = items
         self.ipv6_enabled = ipv6_enabled
         self.communicator = Communicator
+        self.black_list = blist
 
         # A set that contains all the AS-Sets that we discover via parsing
         # and need to be translated into prefix-lists.
@@ -63,8 +63,8 @@ class filterResolver:
 
             pf.statements = analyzer.compose_filter(output_queue)
 
-        logging.debug("ASN: %s AS-SET %s RS-SET %s" % (
-        len(self.dataPool.asnObjDir), len(self.asSetdir.asSetObjDir), len(self.RSSetDir.RouteSetObjDir)))
+            # logging.debug("ASN: %s AS-SET %s RS-SET %s" % (
+            # len(self.dataPool.asnObjDir), len(self.asSetdir.asSetObjDir), len(self.RSSetDir.RouteSetObjDir)))
 
     def _resolveASN(self, asn):
 
@@ -111,7 +111,7 @@ class filterResolver:
             for i in range(0, depth):
                 s += "-"
             logging.debug(
-                "%s>Found %s new ASNs and %s new AS-SETs in %s" % (s, len(new_ASNs), len(new_ASsets), setname))
+                "{}>Found {} new ASNs and {} new AS-SETs in {}".format(s, len(new_ASNs), len(new_ASsets), setname))
 
             for a in new_ASNs:
                 o = self._resolveASN(a)
@@ -122,11 +122,11 @@ class filterResolver:
                 self._resolveASSet(u, depth)
 
         except LookupError:
-            logging.error("No Object found for %s " % setname)
+            logging.error("No Object found for {} ".format(setname))
             return
 
         except Exception as e:
-            logging.warning("Failed to resolve DB object %s. %s " % (setname, e))
+            logging.warning("Failed to resolve DB object {}. {} ".format(setname, e))
             return
 
     def _resolveRSSet(self, rsname, depth):
@@ -143,5 +143,5 @@ class filterResolver:
                 self._resolveRSSet(u, depth)
 
         except Exception as e:
-            logging.error("Failed to fully resolve -> %s. %s" % (rsname, e))
+            logging.error("Failed to fully resolve -> {}. {}".format(rsname, e))
             return

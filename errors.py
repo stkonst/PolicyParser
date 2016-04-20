@@ -44,3 +44,7 @@ class InterpreterError(Error):
 
 class ASNParserError(Error):
     pass
+
+
+class ActionParseError(Error):
+    pass
