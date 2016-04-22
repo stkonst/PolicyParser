@@ -1,6 +1,7 @@
 import logging
 import math
 import multiprocessing as mp
+from multiprocessing.queues import SimpleQueue
 import sys
 import threading
 from threading import Thread, Lock
@@ -106,7 +107,7 @@ class FilterResolver:
             number_of_resolvers = all_ASNs_count
             slice_length = 1
 
-        result_q = mp.queues.SimpleQueue()  # NOTE: Only works with this queue.
+        result_q = SimpleQueue()  # NOTE: Only works with this queue.
         processes = []
         slice_start = 0
         for i in xrange(number_of_resolvers):
