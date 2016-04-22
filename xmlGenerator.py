@@ -188,27 +188,30 @@ class xmlGenerator:
 
     def convertListsToXML(self, ASNList, ASNObjectDir, RSSetList, RouteSetObjectdir, ASSetList, AsSetObjectDir):
         p = self.xml_policy.find('prefix-lists')
+
         for s in ASSetList:
+            pl = et.SubElement(p, 'prefix-list', attrib={'name': s})
+
             try:
                 obj = AsSetObjectDir.asSetObjDir[s]
-                pl = et.SubElement(p, 'prefix-list', attrib={'name': obj.getKey()})
                 self._ASSETtoXML(obj, ASNObjectDir, AsSetObjectDir, pl)
             except KeyError:
                 pass
 
         for v in ASNList:
+            pl = et.SubElement(p, 'prefix-list', attrib={'name': v})
+
             try:
                 obj = ASNObjectDir.asnObjDir[v]
-                pl = et.SubElement(p, 'prefix-list', attrib={'name': obj.origin})
                 self._AStoXML(obj, pl)
-
             except KeyError:
                 pass
 
-        for v in RSSetList:
+        for r in RSSetList:
+            pl = et.SubElement(p, 'prefix-list', attrib={'name': r})
+
             try:
-                obj = RouteSetObjectdir.RouteSetObjDir[v]
-                pl = et.SubElement(p, 'prefix-list', attrib={'name': obj.getKey()})
+                obj = RouteSetObjectdir.RouteSetObjDir[r]
                 self._RouteSetToXML(obj, RouteSetObjectdir, pl)
             except KeyError:
                 pass

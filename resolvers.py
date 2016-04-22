@@ -86,7 +86,7 @@ class filterResolver:
         AS resolving and creates the necessary objects based on the results.
         """
         # Gather all the ASNs seen through filter and recursive resolving.
-        all_ASNs = list(self.recursed_ASes | self.ASNList)
+        all_ASNs = list((self.recursed_ASes | self.ASNList) - self.black_list)
         all_ASNs_count = len(all_ASNs)
         if all_ASNs_count < 1:
             return
