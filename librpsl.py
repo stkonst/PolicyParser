@@ -28,6 +28,9 @@ def read_blisted(as_list):
 def buildXMLpolicy(autnum, ipv6=True, output='screen'):
 
     """ PreProcess section: Get own policy, parse and create necessary Data Structures """
+    #
+    # PAOKARA OLE
+    #
     com = communicator.Communicator(ripe_db_url, default_db_source, alternative_db_sources)
     pp = parsers.PolicyParser(autnum)
 
