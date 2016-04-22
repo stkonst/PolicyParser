@@ -156,9 +156,12 @@ class PolicyParser:
             raise errors.ActionParseError("Failed to parse actions {}".format(actions))
 
     def decomposeExpression(self, text, defaultRule=False):
+
         def _getFirstGroup(text):
+
             brc = 0  # brace count
             gotgroup = False
+
             for i, c in enumerate(text):
                 if c == '{':
                     if i == 0:
@@ -174,12 +177,11 @@ class PolicyParser:
                 if beg.startswith('REFINE') or beg.startswith('EXCEPT'):
                     return text[:i - 1].strip()
 
+            else:
+                if brc != 0:
+                    raise Exception("Brace count does not fit in rule: " + text)
                 else:
-                    if brc != 0:
-                        "TODO: Make it custom error"
-                        raise Exception("Brace count does not fit in rule: " + text)
-                    else:
-                        return text.strip()
+                    return text.strip()
 
         # split line to { factor1; factor2; ... } and the rest (refinements etc)
         e = _getFirstGroup(text.strip())
@@ -335,7 +337,7 @@ class PolicyParser:
                 # logging.warning("Failed to append filter %s on peer %s" % (ha, peer_as.origin))
                 raise errors.InterpreterError("Failed to append filter for peer {}.".format(peer_as.origin))
 
-        pp = rpsl.PeeringPoint(res[1])
+        pp = rpsl.PeeringPoint()
 
         # check if optional action(s) exist
         action_exists = False
