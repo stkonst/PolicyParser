@@ -75,7 +75,7 @@ class RpslObject(object):
     def __repr__(self):
         return self.__str__()
 
-    def getKey(self):
+    def get_key(self):
         """
         Returns key value that should correspond to the object key in RPSL standard view.
         It is here for common HashObjectDirectory to use it for constructing lookup table.
@@ -98,7 +98,7 @@ class RouteObject(RpslObject):
         self.route = route
         self.origin = origin
 
-    def getKey(self):
+    def get_key(self):
         return self.route
 
     def __str__(self):
@@ -122,58 +122,57 @@ class RouteObjectDir(object):
     """
     # TODO extend with a RouteTree to store routes in a tree based structure and provide functions for fast lookup
     def __init__(self, ipv6=True):
-        self.originTable = {}
+        self.origin_table = {}
         self.ipv6 = ipv6
         if self.ipv6:
-            self.originTableV6 = {}
+            self.origin_table_v6 = {}
 
-    def appendRouteObj(self, RouteObject):
-        if RouteObject.ROUTE_ATTR == 'ROUTE6':
-            self.originTableV6[RouteObject.getKey] = RouteObject
-        elif RouteObject.ROUTE_ATTR == 'ROUTE':
-            self.originTable[RouteObject.getKey] = RouteObject
+    def append_route_obj(self, route_object):
+        if route_object.ROUTE_ATTR == 'ROUTE6':
+            self.origin_table_v6[route_object.get_key] = route_object
+        elif route_object.ROUTE_ATTR == 'ROUTE':
+            self.origin_table[route_object.get_key] = route_object
         else:
             raise errors.AppendFilterError('Failed to insert Route object to dictionary')
 
     # def checkRouteExists(self, route, v6=False):
     #     if v6:
-    #         return route in self.originTableV6
+            #         return route in self.origin_table_v6
     #     else:
-    #         return route in self.originTable
+            #         return route in self.origin_table
 
 
-class ASNObject(RpslObject):
+class ASObject(RpslObject):
     """
     Internal representation of an AS
     """
 
     def __init__(self, asnum):
         self.origin = asnum
-        # self.hash = hv
-        self.routeObjDir = RouteObjectDir()
+        self.route_obj_dir = RouteObjectDir()
 
-    def getKey(self):
+    def get_key(self):
         return self.origin
 
     def __str__(self):
         return str(self.origin)
 
-    def appendRouteObj(self, RouteObject):
-        self.routeObjDir[RouteObject.getKey()] = RouteObject
+    def append_route_obj(self, route_object):
+        self.route_obj_dir[route_object.get_key()] = route_object
 
-    # def ASN_has_route(self, RouteObject, v6=False):
+        # def ASN_has_route(self, route_object, v6=False):
     #     if v6:
-    #         return RouteObject.getKey() in self.routeObjDir.originTableV6
+        #         return route_object.get_key() in self.route_obj_dir.origin_table_v6
     #     else:
-    #         return RouteObject.getKey() in self.routeObjDir.originTable
+        #         return route_object.get_key() in self.route_obj_dir.origin_table
 
 
-class ASNObjectDir:
+class AsnObjectDir:
     def __init__(self):
-        self.asnObjDir = {}
+        self.data = {}
 
-    def appendASNObj(self, ASNObject):
-        self.asnObjDir[ASNObject.getKey()] = ASNObject
+    def append_ASN_obj(self, ASN_object):
+        self.data[ASN_object.get_key()] = ASN_object
 
 
 class PolicyAction:
@@ -190,11 +189,11 @@ class PolicyAction:
 
 class PolicyActionList:
     def __init__(self, direction):
-        self.actionDir = dict()
+        self.data = dict()
         self.direction = direction
 
-    def appendAction(self, PolicyAction):
-        self.actionDir[PolicyAction.order] = PolicyAction
+    def append_action(self, policy_action):
+        self.data[policy_action.order] = policy_action
 
 
 # Set-* objects
@@ -208,11 +207,10 @@ class AsSetObject(RpslObject):
     def __init__(self, setname):
         RpslObject.__init__(self)
         self.as_set = setname
-        # self.hash = hv
-        self.ASNmembers = set()
-        self.ASSetmember = set()
+        self.ASN_members = set()
+        self.AS_set_members = set()
 
-    def getKey(self):
+    def get_key(self):
         return self.as_set
 
     def __str__(self):
@@ -221,10 +219,10 @@ class AsSetObject(RpslObject):
 
 class AsSetObjectDir:
     def __init__(self):
-        self.asSetObjDir = {}
+        self.data = {}
 
-    def appendAsSetObj(self, AsSetObject):
-        self.asSetObjDir[AsSetObject.getKey()] = AsSetObject
+    def append_AS_set_obj(self, AS_set_object):
+        self.data[AS_set_object.get_key()] = AS_set_object
 
 
 class PeeringSetObject(RpslObject):
@@ -240,7 +238,7 @@ class PeeringSetObject(RpslObject):
         self.peering = []
         self.mp_peering = []
 
-    def getKey(self):
+    def get_key(self):
         return self.peering_set
 
     def __str__(self):
@@ -260,7 +258,7 @@ class FilterSetObject(RpslObject):
         self.filter = None
         self.mp_filter = None
 
-    def getKey(self):
+    def get_key(self):
         return self.filter_set
 
     def __str__(self):
@@ -286,12 +284,11 @@ class RouteSetObject(RpslObject):
     def __init__(self, setname):
         RpslObject.__init__(self)
         self.route_set = setname
-        # self.hash = hv
         self.members = RouteObjectDir()
         self.mp_members = RouteObjectDir()
-        self.RSSetsDir = set()
+        self.RSes_dir = set()
 
-    def getKey(self):
+    def get_key(self):
         return self.route_set
 
     def __str__(self):
@@ -300,10 +297,10 @@ class RouteSetObject(RpslObject):
 
 class RouteSetObjectdir:
     def __init__(self):
-        self.RouteSetObjDir = {}
+        self.data = {}
 
-    def appendRouteSetObj(self, RouteSetObject):
-        self.RouteSetObjDir[RouteSetObject.getKey()] = RouteSetObject
+    def append_route_set_obj(self, route_set_object):
+        self.data[route_set_object.get_key()] = route_set_object
 
 
 class PeerAS:
@@ -312,9 +309,9 @@ class PeerAS:
         # table scheme: {hash-value: direction}
         self.filters = dict()
         self.mp_filters = dict()
-        self.peeringPoints = dict()
+        self.peering_points = dict()
 
-    def appendFilter(self, info, mp):
+    def append_filter(self, info, mp):
 
         """ It appends only the hash value of the Peer filter
             that has been created and stored previously.
@@ -327,14 +324,14 @@ class PeerAS:
         else:
             self.filters[info[2]] = info[0]
 
-    def appendPeeringPoint(self, peering_point):
-        self.peeringPoints[peering_point.getKey()] = peering_point
+    def append_peering_point(self, peering_point):
+        self.peering_points[peering_point.get_key()] = peering_point
 
-    def returnPeeringPoint(self, pkey):
-        return self.peeringPoints[pkey]
+    def return_peering_point(self, pkey):
+        return self.peering_points[pkey]
 
-    def checkPeeringPointKey(self, pkey):
-        return pkey in self.peeringPoints
+    def check_peering_point_key(self, pkey):
+        return pkey in self.peering_points
 
 
 class PeeringPoint:
@@ -344,16 +341,16 @@ class PeeringPoint:
         self.actions_in = PolicyActionList('import')
         self.actions_out = PolicyActionList('export')
 
-    def appendAddresses(self, local, remote):
+    def append_addresses(self, local, remote):
         self.local_ip = local
         self.remote_ip = remote
 
-    def getKey(self):
-        """
-        Pseudo key generator for dictionary appending.
+    def get_key(self):
+        """Pseudo key generator for dictionary appending.
         If no IPs are present then actions_in are applied in
         every ingress/egress point of the domain
         """
+
         return str(self.local_ip) + "|" + str(self.remote_ip)
 
     def __str__(self):
@@ -362,46 +359,46 @@ class PeeringPoint:
 
 class PeerObjDir:
     def __init__(self):
-        self.peerTable = {}
+        self.peer_table = {}
 
-    def appentPeering(self, peerAs):
-        self.peerTable[peerAs.origin] = peerAs
+    def append_peering(self, peer_AS):
+        self.peer_table[peer_AS.origin] = peer_AS
 
-    def returnPeering(self, asnum):
-        if asnum in self.peerTable.keys():
-            return self.peerTable[asnum]
+    def return_peering(self, asnum):
+        if asnum in self.peer_table.keys():
+            return self.peer_table[asnum]
         else:
             raise errors.ASDiscoveryError('Peer AS does not exist')
 
-    def enumerateObjs(self):
-        for k in self.peerTable.itervalues():
+    def enumerate_objs(self):
+        for k in self.peer_table.itervalues():
             yield k
 
 
-class peerFilter:
+class PeerFilter:
     def __init__(self, hv, afi, expr):
-        self.hashValue = hv
+        self.hash_value = hv
         self.afi = afi
         self.expression = expr
         self.statements = ""
 
     def __str__(self):
-        return str(self.hashValue) + " -> " + self.expression
+        return str(self.hash_value) + " -> " + self.expression
 
 
-class peerFilterDir:
+class PeerFilterDir:
     def __init__(self):
-        self.filterTable = {}
+        self.filter_table = {}
 
-    def appendFilter(self, peerFilter):
-        self.filterTable[peerFilter.hashValue] = peerFilter
+    def append_filter(self, peer_filter):
+        self.filter_table[peer_filter.hash_value] = peer_filter
 
-    def returnFilter(self, hashVal):
-        return self.filterTable[hashVal]
+    def return_filter(self, hv):
+        return self.filter_table[hv]
 
     def number_of_filters(self):
-        return len(self.filterTable)
+        return len(self.filter_table)
 
-    def enumerateObjs(self):
-        for k in self.filterTable.itervalues():
+    def enumerate_objs(self):
+        for k in self.filter_table.itervalues():
             yield k

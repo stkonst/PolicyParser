@@ -1,4 +1,5 @@
 import logging
+
 import requests
 
 import errors
@@ -7,7 +8,7 @@ import errors
 class Communicator():
     ripe_db_url = "http://rest.db.ripe.net"
     default_db_source = "ripe"
-    alternative_db_sources = ("RADB-GRS", "APNIC-GRS", "ARIN-GRS", "LACNIC-GRS", "AFRINIC-GRS")
+    alternative_db_sources = ("RADB-GRS", "APNIC-GRS", "ARIN-GRS", "LACNIC-GRS", "AFRINIC-GRS", "JPIRR-GRS")
 
     def __init__(self, db_url=ripe_db_url, source=default_db_source, alternatives=alternative_db_sources):
         def _get_alternatives(alternatives):
@@ -30,10 +31,10 @@ class Communicator():
         # retrying we eventually open another connection.
         self.max_retries = 3
 
-    def getPolicyByAutnum(self, autnum):
+    def get_policy_by_autnum(self, autnum):
         db_reply = None
         try:
-            db_reply = self._sendDbRequest(self._searchURLbuilder(autnum, None, (), self.flags))
+            db_reply = self._send_DB_request(self._search_URL_builder(autnum, None, (), self.flags))
             logging.debug("Policy received for {}".format(autnum))
         except errors.RIPEDBError:
             logging.error("Failed to receive policy for {} due to RIPE DB error.".format(autnum))
@@ -42,35 +43,35 @@ class Communicator():
 
         return db_reply
 
-    def getFilterSet(self, value):
+    def get_filter_set(self, value):
         #
         # Can make requests for as-set, route-set
         #
         db_reply = None
         try:
-            db_reply = self._sendDbRequest(self._searchURLbuilder(value, None, (), self.flags))
+            db_reply = self._send_DB_request(self._search_URL_builder(value, None, (), self.flags))
         except errors.RIPEDBError:
             logging.error('Get Filter failed for {} due to RIPE DB error.'.format(value))
         except errors.SendRequestError as e:
             logging.error('Get all routes failed for {}. {}'.format(value, e))
         return db_reply
 
-    def getRoutesByAutnum(self, autnum, ipv6_enabled=False):
+    def get_routes_by_autnum(self, autnum, ipv6_enabled=False):
         db_reply = None
         if ipv6_enabled:
-            url = self._searchURLbuilder(autnum, "origin", ("route", "route6"), self.flags)
+            url = self._search_URL_builder(autnum, "origin", ("route", "route6"), self.flags)
         else:
-            url = self._searchURLbuilder(autnum, "origin", ("route",), self.flags)
+            url = self._search_URL_builder(autnum, "origin", ("route",), self.flags)
 
         try:
-            db_reply = self._sendDbRequest(url)
+            db_reply = self._send_DB_request(url)
         except errors.RIPEDBError:
             logging.error('Get all routes failed for {} due to RIPE DB error'.format(autnum))
         except errors.SendRequestError as e:
             logging.error('Get all routes failed for {}. {}'.format(autnum, e))
         return db_reply
 
-    def _searchURLbuilder(self, query_string, inverse_attribute, type_filters, flags):
+    def _search_URL_builder(self, query_string, inverse_attribute, type_filters, flags):
         """
         Example:
             http://rest.db.ripe.net/search.xml?query-string=as199664&type-filter=route6&inverse-attribute=origin
@@ -90,7 +91,7 @@ class Communicator():
 
         return self.db_url + ''.join(new_url)
 
-    def _sendDbRequest(self, db_url):
+    def _send_DB_request(self, db_url):
         retries = self.max_retries
         while True:
             try:

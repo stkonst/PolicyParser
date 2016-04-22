@@ -53,49 +53,49 @@ FIND_IP_FACTOR2 = re.compile("AS(?:\d+)\s(?P<something>.*)\s?(?:action)\s", re.I
 
 class PolicyParser:
     def __init__(self, autnum):
-        self.etContent = et.ElementTree()
+        self.et_content = et.ElementTree()
         self.autnum = autnum
         self.peerings = rpsl.PeerObjDir()
-        self.fltrExpressions = rpsl.peerFilterDir()
+        self.filter_expressions = rpsl.PeerFilterDir()
 
-    def assignContent(self, xmltext):
+    def assign_content(self, xml_text):
         try:
-            self.etContent = et.fromstring(xmltext)
+            self.et_content = et.fromstring(xml_text)
         except et.ParseError, et.TypeError:
             raise Exception('Failed to load DB content in XML format')
 
-    def readPolicy(self):
+    def read_policy(self):
         logging.debug('Will parse policy for {}'.format(self.autnum))
-        for elem in self.etContent.iterfind('./objects/object[@type="aut-num"]/attributes/attribute'):
+        for elem in self.et_content.iterfind('./objects/object[@type="aut-num"]/attributes/attribute'):
             if "import" == elem.attrib.get("name"):
                 try:
-                    self.interpreter(elem.attrib.get("value").upper(), mp=False, rule="import")
+                    self.interpreter(elem.attrib.get("value").upper(), mp=False, rule_type="import")
 
                 except errors.InterpreterError:
                     logging.error("Failed to parse import [{}]".format(elem.attrib.get("value")))
 
             elif "export" == elem.attrib.get("name"):
                 try:
-                    self.interpreter(elem.attrib.get("value").upper(), mp=False, rule="export")
+                    self.interpreter(elem.attrib.get("value").upper(), mp=False, rule_type="export")
 
                 except errors.InterpreterError:
                     logging.error("Failed to parse export [{}]".format(elem.attrib.get("value")))
 
             elif "mp-import" == elem.attrib.get("name"):
                 try:
-                    self.interpreter(elem.attrib.get("value").upper(), mp=True, rule="import")
+                    self.interpreter(elem.attrib.get("value").upper(), mp=True, rule_type="import")
 
                 except errors.InterpreterError:
                     logging.error("Failed to parse mp-import [{}]".format(elem.attrib.get("value")))
 
             elif "mp-export" == elem.attrib.get("name"):
                 try:
-                    self.interpreter(elem.attrib.get("value").upper(), mp=True, rule="export")
+                    self.interpreter(elem.attrib.get("value").upper(), mp=True, rule_type="export")
 
                 except errors.InterpreterError:
                     logging.error("Failed to parse mp-export [{}]".format(elem.attrib.get("value")))
 
-    def extractIPs(self, policy_object, PeeringPoint, mp=False):
+    def extract_IPs(self, policy_object, peering_point, mp=False):
         """RPSL Allows also 1 out of the 2 IPs to exist."""
 
         items = re.search(IP_EXTRACT_RE, policy_object)
@@ -114,12 +114,12 @@ class PolicyParser:
                 elif tools.is_valid_ipv6(items.group("local")):
                     l = str(items.group("local"))
 
-            PeeringPoint.appendAddresses(l, r)
+            peering_point.append_addresses(l, r)
 
         except:
             raise errors.IPparseError("Failed to parse IP values")
 
-    def extractActions(self, line, PolicyActionList, export=False):
+    def extract_actions(self, line, policy_action_list, export=False):
         if export:
             actions = filter(None, re.search(EXTRACT_ACTIONS_EXPORT, line).group(1).replace(" ", "").split(";"))
         else:
@@ -135,9 +135,9 @@ class PolicyParser:
                             # Multiple values of community exist
                             mval = val.split(",")
                             for c in mval:
-                                PolicyActionList.appendAction(rpsl.PolicyAction(i, "community", "append", c))
+                                policy_action_list.append_action(rpsl.PolicyAction(i, "community", "append", c))
                         else:
-                            PolicyActionList.appendAction(rpsl.PolicyAction(i, "community", "append", val))
+                            policy_action_list.append_action(rpsl.PolicyAction(i, "community", "append", val))
                     else:
                         val = re.search(ACTION_COMMUNITY_DELETE, action).group(1)
                         if val is not None:
@@ -145,20 +145,20 @@ class PolicyParser:
                                 # Multiple values of community exist
                                 mval = val.split(",")
                                 for c in mval:
-                                    PolicyActionList.appendAction(rpsl.PolicyAction(i, "community", "delete", c))
+                                    policy_action_list.append_action(rpsl.PolicyAction(i, "community", "delete", c))
                             else:
-                                PolicyActionList.appendAction(rpsl.PolicyAction(i, "community", "delete", val))
+                                policy_action_list.append_action(rpsl.PolicyAction(i, "community", "delete", val))
                 elif 'ASPATH' in action:
                     val = re.search(ACTION_ASPATH_PREPEND, action).group(1)
-                    PolicyActionList.appendAction(rpsl.PolicyAction(i, "aspath", "prepend", val))
+                    policy_action_list.append_action(rpsl.PolicyAction(i, "aspath", "prepend", val))
                 else:
                     elements = action.split("=")
-                    PolicyActionList.appendAction(rpsl.PolicyAction(i, elements[0], "=", elements[1]))
+                    policy_action_list.append_action(rpsl.PolicyAction(i, elements[0], "=", elements[1]))
         except:
             raise errors.ActionParseError("Failed to parse actions {}".format(actions))
 
-    def decomposeExpression(self, text, defaultRule=False):
-        def _getFirstGroup(text):
+    def decompose_expression(self, text, default_rule=False):
+        def _get_first_group(text):
             brc = 0  # brace count
             gotgroup = False
 
@@ -183,7 +183,7 @@ class PolicyParser:
                     return text.strip()
 
         # split line to { factor1; factor2; ... } and the rest (refinements etc)
-        e = _getFirstGroup(text.strip())
+        e = _get_first_group(text.strip())
 
         # defaults for rules like: export: default to AS1234
         sel = e
@@ -200,7 +200,7 @@ class PolicyParser:
             [sel, fltr] = e.split(FACTOR_SPLIT_NETWORKS, 1)
             fltr = (FACTOR_CONST_NETWORKS + ' ' + fltr.strip())
         else:
-            if defaultRule:  # default: rule does not need to include filter, then default to ANY
+            if default_rule:  # default: rule does not need to include filter, then default to ANY
                 fltr = 'ANY'
             else:
                 logging.warning("Syntax error: Can not find selectors in:", e, "decomposing expression:", text)
@@ -217,7 +217,7 @@ class PolicyParser:
             # TODO: make it custom error
             raise Exception("Can not find filter factors in: '" + sel + "' in text: " + text)
 
-    def normalizeFactor(self, selector, fltr):
+    def normalize_factor(self, selector, fltr):
         """Returns (subject, filter) where subject is AS or AS-SET and
         filter is a filter. For example in factor:
         "to AS1234 announce AS-SECRETNET" : the subject is AS1234 and
@@ -245,7 +245,7 @@ class PolicyParser:
 
         raise Exception("Can not parse factor: " + factor)
 
-    def parseRule(self, mytext, direction, mp):
+    def parse_rule(self, rule, direction, mp):
         """Returns (afi, [(subject, filter)]). Remove all refine and except
         blocks as well as protocol and to specs.
 
@@ -262,30 +262,30 @@ class PolicyParser:
         afi = 'IPV4.UNICAST'
 
         if mp:
-            r = AFI_MATCH.match(mytext)
+            r = AFI_MATCH.match(rule)
             ############# HACK HACK HACK !!! fix of a syntax error in RIPE DB in object
             ############# aut-num AS2852 (cesnet) that contains weird line with merged
             ############# afi spec and
-            rh = AFI_MATCH_HACK.match(mytext)
+            rh = AFI_MATCH_HACK.match(rule)
             if rh:
                 r = rh
             ############# END OF HACK
 
             if r:
                 afi = r.group(1)
-                mytext = r.group(2)
+                rule = r.group(2)
             else:
                 afi = 'ANY'
 
-        factors = self.decomposeExpression(mytext)
+        factors = self.decompose_expression(rule)
 
-        return (direction, afi, [self.normalizeFactor(f, factors[1]) for f in factors[0]])
+        return (direction, afi, [self.normalize_factor(f, factors[1]) for f in factors[0]])
 
-    def interpreter(self, mytext, rule, mp=False):
-        """Analyse and interpret the rule.
+    def interpreter(self, rule, rule_type, mp=False):
+        """Analyse and interpret the rule_type.
 
         subject = AS that is announcing the prefix to or as that the prefix is exported to by
-        the AS that conains this rule
+        the AS that conains this rule_type
         prefix = prefix that is in question
         currentAsPath = aspath as it is (most likely) seen by the AS
         assetDirectory = HashObjectDir that conains the AsSetObjects
@@ -294,14 +294,14 @@ class PolicyParser:
         ipv6 = matching IPv6 route?
         """
 
-        if "REFINE" in mytext:
+        if "REFINE" in rule:
             raise errors.InterpreterError("REFINE is not currently supported")
             return
 
-        res = self.parseRule(mytext, rule, mp)  # return (direction, afi, [(subject, filter)])
+        res = self.parse_rule(rule, rule_type, mp)  # return (direction, afi, [(subject, filter)])
 
         try:
-            peer_as = self.peerings.returnPeering(res[2][0][0])
+            peer_as = self.peerings.return_peering(res[2][0][0])
         except errors.ASDiscoveryError:
             peer_as = rpsl.PeerAS(res[2][0][0])
             # logging.debug('New peering found (%s)' % res[2][0][0])
@@ -320,12 +320,12 @@ class PolicyParser:
             ha = str(xxhash.xxh64(res[2][0][1]).hexdigest())
 
             # The actual peer filter is constructed and stored here.
-            pf = rpsl.peerFilter(ha, res[1], res[2][0][1])
-            self.fltrExpressions.appendFilter(pf)
+            pf = rpsl.PeerFilter(ha, res[1], res[2][0][1])
+            self.filter_expressions.append_filter(pf)
 
             # Append in the peer the filter set(direction, afi, hash)
             try:
-                peer_as.appendFilter((res[0], res[1], ha), mp)  # !!!!!!!!!!!!!
+                peer_as.append_filter((res[0], res[1], ha), mp)  # !!!!!!!!!!!!!
             except errors.AppendFilterError:
                 # logging.warning("Failed to append filter %s on peer %s" % (ha, peer_as.origin))
                 raise errors.InterpreterError("Failed to append filter for peer {}.".format(peer_as.origin))
@@ -334,12 +334,12 @@ class PolicyParser:
 
         # check if optional action(s) exist
         action_exists = False
-        if " ACTION " in mytext:
+        if " ACTION " in rule:
             action_exists = True
-            if rule is "import":
+            if rule_type is "import":
                 pal = rpsl.PolicyActionList(direction="import")
                 try:
-                    self.extractActions(mytext, pal)
+                    self.extract_actions(rule, pal)
                     pp.actions_in = pal
                 except errors.ActionParseError:
                     logging.error("Failed to parse import actions")
@@ -347,30 +347,30 @@ class PolicyParser:
             else:
                 pal = rpsl.PolicyActionList(direction="export")
                 try:
-                    self.extractActions(mytext, pal, export=True)
+                    self.extract_actions(rule, pal, export=True)
                     pp.actions_out = pal
                 except errors.ActionParseError:
                     logging.error("Failed to parse export actions")
                     pass
 
         if action_exists:
-            possible_ips = re.search(FIND_IP_FACTOR2, mytext)
+            possible_ips = re.search(FIND_IP_FACTOR2, rule)
         else:
-            possible_ips = re.search(FIND_IP_FACTOR1, mytext)
+            possible_ips = re.search(FIND_IP_FACTOR1, rule)
             # XXX === warning ===
             #    In case of peering on multiple network edges,
             #    more peering-IPs are present in the policy!!!
         if possible_ips is not None and len(possible_ips.group("something")) > 2:
             try:
-                self.extractIPs(mytext, pp, mp)
-                if peer_as.checkPeeringPointKey(pp.getKey()):
-                    pp = peer_as.returnPeeringPoint(pp.getKey())
+                self.extract_IPs(rule, pp, mp)
+                if peer_as.check_peering_point_key(pp.get_key()):
+                    pp = peer_as.return_peering_point(pp.get_key())
             except errors.IPparseError as e:
                 logging.error(str(e))
                 pass
 
-        peer_as.appendPeeringPoint(pp)
-        self.peerings.appentPeering(peer_as)
+        peer_as.append_peering_point(pp)
+        self.peerings.append_peering(peer_as)
 
 
 def parse_AS_routes(xml_resp, ipv4=True, ipv6=True):

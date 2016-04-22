@@ -12,8 +12,9 @@ help_message = "Please run again by typing parser -a <ASXXX>"
 params = dict()
 black_list = set()
 
-def read_blisted(as_list):
-    items = set(as_list.split(","))
+
+def read_blisted(AS_list):
+    items = set(AS_list.split(","))
     for i in items:
         if not rpsl.is_ASN(i):
             print "{} is not a valid AS number".format(i)
@@ -21,34 +22,34 @@ def read_blisted(as_list):
     return items
 
 
-def buildXMLpolicy(autnum, ipv6=True, output='screen'):
+def build_XML_policy(autnum, ipv6=True, output='screen'):
     #
     # PreProcess section: Get own policy, parse and create necessary Data Structures.
     #
     com = communicator.Communicator()
     pp = parsers.PolicyParser(autnum)
 
-    pp.assignContent(com.getPolicyByAutnum(autnum))
-    pp.readPolicy()
-    logging.debug("Found {} expressions to resolve.".format(pp.fltrExpressions.number_of_filters()))
-    if pp.fltrExpressions.number_of_filters() < 1:
+    pp.assign_content(com.get_policy_by_autnum(autnum))
+    pp.read_policy()
+    logging.debug("Found {} expressions to resolve.".format(pp.filter_expressions.number_of_filters()))
+    if pp.filter_expressions.number_of_filters() < 1:
         print("No filter expressions found.")
         return None
     com.session.close()
 
     #
-    # Process section: Resolve necessary fltrExpressions into prefixes.
+    # Process section: Resolve necessary filter_expressions into prefixes.
     #
-    fr = resolvers.filterResolver(pp.fltrExpressions, ipv6, black_list)
-    fr.resolveFilters()
+    fr = resolvers.FilterResolver(pp.filter_expressions, ipv6, black_list)
+    fr.resolve_filters()
 
     #
     # PostProcess section: Create and deliver the corresponding XML output.
     #
-    xmlgen = xmlGenerator.xmlGenerator(autnum)
-    xmlgen.convertPeersToXML(pp.peerings)
-    xmlgen.convertFiltersToXML(pp.fltrExpressions)
-    xmlgen.convertListsToXML(fr.ASNList, fr.dataPool, fr.RSSetList, fr.RSSetDir, fr.ASSetList, fr.asSetdir)
+    xmlgen = xmlGenerator.XmlGenerator(autnum)
+    xmlgen.convert_peers_to_XML(pp.peerings)
+    xmlgen.convert_filters_to_XML(pp.filter_expressions)
+    xmlgen.convert_lists_to_XML(fr.AS_list, fr.AS_dir, fr.RS_list, fr.RS_dir, fr.AS_set_list, fr.AS_set_dir)
 
     if output == "browser":
         return xmlgen.__str__()
@@ -91,14 +92,14 @@ if __name__ == "__main__":
         logging.getLogger("requests").setLevel(logging.WARNING)
         if "output_file" in params:
             logging.basicConfig(filename=params["output_file"] + '.log', level=logging.DEBUG)
-            xml_result = buildXMLpolicy(params.get("as_number"), output='file')
+            xml_result = build_XML_policy(params.get("as_number"), output='file')
             if xml_result:
                 f = open(params["output_file"], mode='w')
                 f.write(xml_result)
                 f.close()
         else:
             logging.basicConfig(level=logging.DEBUG)
-            print buildXMLpolicy(params.get("as_number"), output='screen')
+            print build_XML_policy(params.get("as_number"), output='screen')
 
         logging.info("All done. XML policy is ready.")
 

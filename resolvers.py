@@ -14,48 +14,49 @@ import rpsl
 
 threads_count = 10
 
-class filterResolver:
+
+class FilterResolver:
     def __init__(self, items, ipv6_enabled, blist):
 
-        self.peerFilters = items
+        self.peer_filters = items
         self.ipv6_enabled = ipv6_enabled
         self.black_list = blist
 
         # Set that contains all the AS sets that we discover via filter
         # parsing and need to be translated into prefix-lists.
-        self.ASSetList = set()
+        self.AS_set_list = set()
 
         # Data pool that contains all the AS-SETs that we discovered
         # (included nested ones) to minimise interaction with RIPE-DB (double resolving).
-        self.asSetdir = rpsl.AsSetObjectDir()
+        self.AS_set_dir = rpsl.AsSetObjectDir()
 
         # Set that contains all the route sets that we discover via filter
         # parsing and need to be translated into prefix-lists.
-        self.RSSetList = set()
+        self.RS_list = set()
 
         # Data pool that contains all the RS-SETs that we discovered
         # (included nested ones) to minimise interaction with RIPE-DB (double resolving).
-        self.RSSetDir = rpsl.RouteSetObjectdir()
+        self.RS_dir = rpsl.RouteSetObjectdir()
 
         # Set that contains all the ASNs that we discover via filter parsing
         # and need to be translated into prefix-lists.
-        self.ASNList = set()
+        self.AS_list = set()
 
         # Data pool that contains all the ASN objects (including nested ones)
-        self.dataPool = rpsl.ASNObjectDir()
+        self.AS_dir = rpsl.AsnObjectDir()
 
         # The ASes seen through recursive resolving of AS sets. Minimises
         # interaction with RIPE-DB (double resolving).
         self.recursed_ASes = set()
 
-    def resolveFilters(self):
-        for pf in self.peerFilters.enumerateObjs():
+    def resolve_filters(self):
+        for pf in self.peer_filters.enumerate_objs():
             # Analyser will analyse the filter and recognise the elements that compose it
             output_queue, new_ASNs, new_AS_sets, new_RSets = analyzer.analyze_filter(pf.expression)
 
-            self.ASNList.update(new_ASNs)
-            self.ASSetList.update(new_AS_sets)
-            self.RSSetList.update(new_RSets)
+            self.AS_list.update(new_ASNs)
+            self.AS_set_list.update(new_AS_sets)
+            self.RS_list.update(new_RSets)
 
             pf.statements = analyzer.compose_filter(output_queue)
 
@@ -70,23 +71,23 @@ class filterResolver:
         """Spawns a process to handle the recursive AS set resolving and
         creates the necessary objects based on the results.
         """
-        if len(self.ASSetList) < 1:
+        if len(self.AS_set_list) < 1:
             return
 
         pool = mp.Pool(1)
-        AS_set_directory, self.recursed_ASes = pool.apply(_subprocess_AS_set_resolving, (self.ASSetList,))
+        AS_set_directory, self.recursed_ASes = pool.apply(_subprocess_AS_set_resolving, (self.AS_set_list,))
         for setname, children in AS_set_directory.iteritems():
             setObj = rpsl.AsSetObject(setname)
-            setObj.ASSetmember.update(children['sets'])
-            setObj.ASNmembers.update(children['asns'])
-            self.asSetdir.appendAsSetObj(setObj)
+            setObj.AS_set_members.update(children['sets'])
+            setObj.ASN_members.update(children['asns'])
+            self.AS_set_dir.append_AS_set_obj(setObj)
 
     def _handle_ASes(self):
         """Spawns several processes (based on the available CPUs) to handle the
         AS resolving and creates the necessary objects based on the results.
         """
         # Gather all the ASNs seen through filter and recursive resolving.
-        all_ASNs = list((self.recursed_ASes | self.ASNList) - self.black_list)
+        all_ASNs = list((self.recursed_ASes | self.AS_list) - self.black_list)
         all_ASNs_count = len(all_ASNs)
         if all_ASNs_count < 1:
             return
@@ -134,14 +135,14 @@ class filterResolver:
             # If the AS has routes create the appropriate ASN object and add it
             # to the data pool.
             if routes is not None and (routes['ipv4'] or routes['ipv6']):
-                ASN_object = rpsl.ASNObject(asn)
+                ASN_object = rpsl.ASObject(asn)
                 for prefix in routes['ipv4']:
                     route_object = rpsl.RouteObject(prefix, asn)
-                    ASN_object.routeObjDir.appendRouteObj(route_object)
+                    ASN_object.route_obj_dir.append_route_obj(route_object)
                 for prefix in routes['ipv6']:
                     route6_object = rpsl.Route6Object(prefix, asn)
-                    ASN_object.routeObjDir.appendRouteObj(route6_object)
-                self.dataPool.appendASNObj(ASN_object)
+                    ASN_object.route_obj_dir.append_route_obj(route6_object)
+                self.AS_dir.append_ASN_obj(ASN_object)
             done += 1
 
         # PROGRESS START
@@ -166,21 +167,21 @@ class filterResolver:
         TODO: We can have ASes and AS sets as children so maybe run it before
         the other resolving.
         """
-        if len(self.RSSetList) < 1:
+        if len(self.RS_list) < 1:
             return
 
         pool = mp.Pool(1)
-        RS_directory = pool.apply(_subprocess_RS_resolving, (self.RSSetList,))
+        RS_directory = pool.apply(_subprocess_RS_resolving, (self.RS_list,))
         for setname, children in RS_directory.iteritems():
             route_set_obj = rpsl.RouteSetObject(setname)
-            route_set_obj.RSSetsDir.update(children['sets'])
+            route_set_obj.RSes_dir.update(children['sets'])
             for route in children['routes'].get('ipv4'):
                 route_object = rpsl.RouteObject(route, None)  # XXX Do we need origin?
-                route_set_obj.members.appendRouteObj(route_object)
+                route_set_obj.members.append_route_obj(route_object)
             for route6 in children['routes'].get('ipv6'):
                 route6_object = rpsl.Route6Object(route6, None)  # XXX Do we need origin?
-                route_set_obj.mp_members.appendRouteObj(route6_object)
-            self.RSSetDir.appendRouteSetObj(route_set_obj)
+                route_set_obj.mp_members.append_route_obj(route6_object)
+            self.RS_dir.append_route_set_obj(route_set_obj)
 
 
 def _subprocess_init():
@@ -200,15 +201,15 @@ def _subprocess_init():
                         " otherwise!")
 
 
-def _subprocess_AS_set_resolving(ASSetList):
-    """Resolves the given ASSetList recursively.
+def _subprocess_AS_set_resolving(AS_set_list):
+    """Resolves the given AS_set_list recursively.
 
     This function is going to be spawned as a process that in turn spawns
     threads to handle the network IO.
 
     Parameters
     ----------
-    ASSetList : set
+    AS_set_list : set
         The AS sets to be resolved.
 
     Returns
@@ -222,7 +223,7 @@ def _subprocess_AS_set_resolving(ASSetList):
 
     comm = communicator.Communicator()
     q = Queue()
-    recursed_sets = dict.fromkeys(ASSetList, '')
+    recursed_sets = dict.fromkeys(AS_set_list, '')
     recursed_sets_lock = Lock()
     recursed_ASes = set()
     recursed_ASes_lock = Lock()
@@ -249,7 +250,7 @@ def _subprocess_AS_set_resolving(ASSetList):
 
             AS_sets, ASNs = '', ''
             try:
-                resp = comm.getFilterSet(setname)
+                resp = comm.get_filter_set(setname)
                 if resp is None:
                     raise LookupError
                 AS_sets, ASNs = parsers.parse_AS_set_members(resp)
@@ -288,7 +289,7 @@ def _subprocess_AS_set_resolving(ASSetList):
             q.task_done()
 
     # Enqueue the AS sets present in the filter for resolving.
-    for AS_set in ASSetList:
+    for AS_set in AS_set_list:
         q.put(AS_set)
 
     threads = [Thread(target=_threaded_resolve_set) for _ in xrange(threads_count)]
@@ -339,7 +340,7 @@ def _subprocess_AS_resolving(ASN_batch, result_q):
                 break
 
             try:
-                resp = comm.getRoutesByAutnum(current_AS, ipv6_enabled=True)
+                resp = comm.get_routes_by_autnum(current_AS, ipv6_enabled=True)
                 if resp is None:
                     raise LookupError
                 routes = parsers.parse_AS_routes(resp)
@@ -375,15 +376,15 @@ def _subprocess_AS_resolving(ASN_batch, result_q):
         t.join()
 
 
-def _subprocess_RS_resolving(RSSetList):
-    """Resolves the given RSSetList recursively.
+def _subprocess_RS_resolving(RS_list):
+    """Resolves the given RS_list recursively.
 
     This function is going to be spawned as a process that in turn spawns
     threads to handle the network IO.
 
     Parameters
     ----------
-    RSSetList : set
+    RS_list : set
         The RSes to be resolved.
 
     Returns
@@ -395,7 +396,7 @@ def _subprocess_RS_resolving(RSSetList):
 
     comm = communicator.Communicator()
     q = Queue()
-    recursed_sets = dict.fromkeys(RSSetList, '')
+    recursed_sets = dict.fromkeys(RS_list, '')
     recursed_sets_lock = Lock()
     RS_directory = dict()
     RS_directory_lock = Lock()
@@ -420,7 +421,7 @@ def _subprocess_RS_resolving(RSSetList):
 
             RSes, routes = '', ''
             try:
-                resp = comm.getFilterSet(setname)
+                resp = comm.get_filter_set(setname)
                 if resp is None:
                     raise LookupError
                 RSes, routes = parsers.parse_RS_members(resp)
@@ -457,7 +458,7 @@ def _subprocess_RS_resolving(RSSetList):
             q.task_done()
 
     # Enqueue the RSes present in the filter for resolving.
-    for route_set in RSSetList:
+    for route_set in RS_list:
         q.put(route_set)
 
     threads = [Thread(target=_threaded_resolve_set) for _ in xrange(threads_count)]
