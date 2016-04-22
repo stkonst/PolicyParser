@@ -3,18 +3,14 @@ import logging
 from xml.dom.minidom import parseString
 
 import communicator
-import rpsl
 import parsers
 import resolvers
+import rpsl
 import xmlGenerator
 
 help_message = "Please run again by typing parser -a <ASXXX>"
-ripe_db_url = "http://rest.db.ripe.net"
-default_db_source = "ripe"
-alternative_db_sources = ("RADB-GRS", "APNIC-GRS", "ARIN-GRS", "LACNIC-GRS", "AFRINIC-GRS")
 params = dict()
 black_list = set()
-
 
 def read_blisted(as_list):
     items = set(as_list.split(","))
@@ -26,31 +22,30 @@ def read_blisted(as_list):
 
 
 def buildXMLpolicy(autnum, ipv6=True, output='screen'):
-
-    """ PreProcess section: Get own policy, parse and create necessary Data Structures """
     #
-    # PAOKARA OLE
+    # PreProcess section: Get own policy, parse and create necessary Data Structures.
     #
-    com = communicator.Communicator(ripe_db_url, default_db_source, alternative_db_sources)
+    com = communicator.Communicator()
     pp = parsers.PolicyParser(autnum)
 
     pp.assignContent(com.getPolicyByAutnum(autnum))
     pp.readPolicy()
-    logging.debug("Found {} expressions to resolve".format(pp.fltrExpressions.number_of_filters()))
-
-    """
-        Process section: Resolve necessary fltrExpressions into prefixes
-        Maybe use Multithreading to fetch necessary info from RIPE DB.
-    """
-
-    fr = resolvers.filterResolver(pp.fltrExpressions, com, ipv6, black_list)
-    fr.resolveFilters()
-
-    """ PostProcess: Create and deliver the corresponding XML output """
+    logging.debug("Found {} expressions to resolve.".format(pp.fltrExpressions.number_of_filters()))
+    if pp.fltrExpressions.number_of_filters() < 1:
+        print("No filter expressions found.")
+        return None
     com.session.close()
 
-    xmlgen = xmlGenerator.xmlGenerator(autnum)
+    #
+    # Process section: Resolve necessary fltrExpressions into prefixes.
+    #
+    fr = resolvers.filterResolver(pp.fltrExpressions, ipv6, black_list)
+    fr.resolveFilters()
 
+    #
+    # PostProcess section: Create and deliver the corresponding XML output.
+    #
+    xmlgen = xmlGenerator.xmlGenerator(autnum)
     xmlgen.convertPeersToXML(pp.peerings)
     xmlgen.convertFiltersToXML(pp.fltrExpressions)
     xmlgen.convertListsToXML(fr.ASNList, fr.dataPool, fr.RSSetList, fr.RSSetDir, fr.ASSetList, fr.asSetdir)
@@ -62,6 +57,7 @@ def buildXMLpolicy(autnum, ipv6=True, output='screen'):
         return reparsed.toprettyxml(indent="\t")
     elif output == "file":
         return xmlgen.__str__()
+
 
 # ~~~ Script starts here ~~~
 if __name__ == "__main__":
@@ -96,11 +92,32 @@ if __name__ == "__main__":
         if "output_file" in params:
             logging.basicConfig(filename=params["output_file"] + '.log', level=logging.DEBUG)
             xml_result = buildXMLpolicy(params.get("as_number"), output='file')
-            f = open(params["output_file"], mode='w')
-            f.write(xml_result)
-            f.close()
+            if xml_result:
+                f = open(params["output_file"], mode='w')
+                f.write(xml_result)
+                f.close()
         else:
             logging.basicConfig(level=logging.DEBUG)
             print buildXMLpolicy(params.get("as_number"), output='screen')
 
         logging.info("All done. XML policy is ready.")
+
+    #def memory_usage():
+    #    """http://stackoverflow.com/a/898406"""
+    #    """Memory usage of the current process in kilobytes."""
+    #    status = None
+    #    result = {'peak': 0, 'rss': 0}
+    #    try:
+    #        # This will only work on systems with a /proc file system
+    #        # (like Linux).
+    #        status = open('/proc/self/status')
+    #        for line in status:
+    #            parts = line.split()
+    #            key = parts[0][2:-1].lower()
+    #            if key in result:
+    #                result[key] = int(parts[1])
+    #    finally:
+    #        if status is not None:
+    #            status.close()
+    #    return result
+    #print "Memory: {}".format(memory_usage())

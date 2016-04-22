@@ -48,7 +48,6 @@ class xmlGenerator:
         return new_prefix
 
     def getPolicyTemplate(self, autnum):
-
         template_root = et.Element('root')
 
         template_root.append(et.Comment('This is a resolved XML policy file for {}'.format(autnum)))
@@ -63,7 +62,6 @@ class xmlGenerator:
         return template_root
 
     def _filterToXML(self, peerFilter):
-
         fltr_root = et.Element('peering-filter', attrib={"hash-value": peerFilter.hashValue, "afi": peerFilter.afi})
         et.SubElement(fltr_root, "expression").text = peerFilter.expression
         statement_root = et.SubElement(fltr_root, "statements")
@@ -86,7 +84,6 @@ class xmlGenerator:
         return fltr_root
 
     def _AStoXML(self, ASNObject, pl):
-
         for r in ASNObject.routeObjDir.originTable.itervalues():
             et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
 
@@ -140,7 +137,6 @@ class xmlGenerator:
                     AS_set_tree.extend(child_set)
 
     def _peeringPointToXML(self, points_root, PeeringPoint):
-
         if PeeringPoint.getKey() is not "|":
             pp_root = et.Element('peering-point')
 
@@ -156,7 +152,6 @@ class xmlGenerator:
             points_root.append(self._getActionTemplate(PeeringPoint.actions_out))
 
     def peerToXML(self, PeerAS):
-
         template_root = et.Element('peer', attrib={"aut-num": PeerAS.origin})
 
         points = et.SubElement(template_root, 'peering-points')
@@ -192,7 +187,6 @@ class xmlGenerator:
             self.xml_policy.find('peering-policy').append(self.peerToXML(val))
 
     def convertListsToXML(self, ASNList, ASNObjectDir, RSSetList, RouteSetObjectdir, ASSetList, AsSetObjectDir):
-
         p = self.xml_policy.find('prefix-lists')
         for s in ASSetList:
             try:

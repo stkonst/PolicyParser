@@ -108,7 +108,7 @@ def _explode_filter(filter_text):
 
             # If the thing that is stuck onto the PREFIX_END is not a range
             # operator, make some distance.
-            if not rpsl.is_pfx_range_operator(trail):
+            if not rpsl.is_range_operator(trail):
                 filter_text = filter_text[:i] + ' ' + char + ' ' + filter_text[i + 1:]
                 adj += 2
             else:

@@ -1,13 +1,24 @@
 import logging
-import xml.etree.cElementTree as et
 import re
+try:
+    from cStringIO import StringIO
+except ImportError:
+    logging.warning("cStringIO was not available! Expect the execution time and memory consumption to go up!")
+    from StringIO import StringIO
+try:
+    import xml.etree.cElementTree as et
+except ImportError:
+    logging.warning("cElementTree was not available! Expect the execution time and memory consumption to go up!")
+    import xml.etree.ElementTree as et
+
 import xxhash
 
-import libtools as tools
 import errors
+import libtools as tools
 import rpsl
 
-''' Start of Tomas' expressions for parsers '''
+
+# Start of Tomas' expressions for parsers.
 FACTOR_SPLIT_ACCEPT = 'ACCEPT'  # regexp would be better but slower
 FACTOR_SPLIT_ANNOUNCE = 'ANNOUNCE'  # regexp would be better but slower
 FACTOR_SPLIT_NETWORKS = 'NETWORKS'  # regexp would be better but slower
@@ -25,8 +36,7 @@ AFI_MATCH_HACK = re.compile('^AFI\s+(IPV6.UNICAST)(FROM.*)$', re.I)
 IMPORT_FACTOR_MATCH = re.compile('^FROM\s+([^\s]+)(\s?(.*)\sACCEPT(.+))$', re.I)
 EXPORT_FACTOR_MATCH = re.compile('^TO\s+([^\s]+)(\s?(.*)\sANNOUNCE(.+))$', re.I)
 DEFAULT_FACTOR_MATCH = re.compile('^TO\s+([^\s]+)(\s?(.*)\sNETWORKS(.+)|.*)$', re.I)
-
-''' End of Tomas' expressions for parsers '''
+# End of Tomas' expressions for parsers.
 
 ACTION_RESHAPE = re.compile(r'\s|[{\s*|\s*}]')
 ACTION_COMMUNITY_APPEND = re.compile('\.(?:append|=)[{(]([^)}]*)[)}]', re.I)
@@ -36,8 +46,7 @@ ACTION_ASPATH_PREPEND = re.compile('prepend\((.*)\)', re.I)
 EXTRACT_ACTIONS_EXPORT = re.compile('ACTION(.*)ANNOUNCE', re.I)
 EXTRACT_ACTIONS_IMPORT = re.compile('ACTION(.*)ACCEPT', re.I)
 
-IP_EXTRACT_RE = re.compile("(?P<afi>AFI\s\w*\.\w*)?\s?(FROM|TO)\sAS(?:\d+)\s(?P<remote>\S+)?\s?AT?\s?(?P<local>\S+)?\s",
-                           re.I)
+IP_EXTRACT_RE = re.compile("(?P<afi>AFI\s\w*\.\w*)?\s?(FROM|TO)\sAS(?:\d+)\s(?P<remote>\S+)?\s?AT?\s?(?P<local>\S+)?\s", re.I)
 FIND_IP_FACTOR1 = re.compile("AS(?:\d+)\s(?P<something>.*)\s?(?:accept|announce)\s", re.I)
 FIND_IP_FACTOR2 = re.compile("AS(?:\d+)\s(?P<something>.*)\s?(?:action)\s", re.I)
 
@@ -52,11 +61,10 @@ class PolicyParser:
     def assignContent(self, xmltext):
         try:
             self.etContent = et.fromstring(xmltext)
-        except et.ParseError:
+        except et.ParseError, et.TypeError:
             raise Exception('Failed to load DB content in XML format')
 
     def readPolicy(self):
-
         logging.debug('Will parse policy for {}'.format(self.autnum))
         for elem in self.etContent.iterfind('./objects/object[@type="aut-num"]/attributes/attribute'):
             if "import" == elem.attrib.get("name"):
@@ -65,7 +73,6 @@ class PolicyParser:
 
                 except errors.InterpreterError:
                     logging.error("Failed to parse import [{}]".format(elem.attrib.get("value")))
-                    pass
 
             elif "export" == elem.attrib.get("name"):
                 try:
@@ -73,7 +80,6 @@ class PolicyParser:
 
                 except errors.InterpreterError:
                     logging.error("Failed to parse export [{}]".format(elem.attrib.get("value")))
-                    pass
 
             elif "mp-import" == elem.attrib.get("name"):
                 try:
@@ -81,7 +87,6 @@ class PolicyParser:
 
                 except errors.InterpreterError:
                     logging.error("Failed to parse mp-import [{}]".format(elem.attrib.get("value")))
-                    pass
 
             elif "mp-export" == elem.attrib.get("name"):
                 try:
@@ -89,16 +94,14 @@ class PolicyParser:
 
                 except errors.InterpreterError:
                     logging.error("Failed to parse mp-export [{}]".format(elem.attrib.get("value")))
-                    pass
 
     def extractIPs(self, policy_object, PeeringPoint, mp=False):
-        """ RPSL Allows also 1 out of the 2 IPs to exist. """
+        """RPSL Allows also 1 out of the 2 IPs to exist."""
 
         items = re.search(IP_EXTRACT_RE, policy_object)
 
         try:
-            l = ""
-            r = ""
+            l, r = "", ""
             if items.group("remote") is not None:
                 if tools.is_valid_ipv4(items.group("remote")):
                     r = str(items.group("remote"))
@@ -117,7 +120,6 @@ class PolicyParser:
             raise errors.IPparseError("Failed to parse IP values")
 
     def extractActions(self, line, PolicyActionList, export=False):
-
         if export:
             actions = filter(None, re.search(EXTRACT_ACTIONS_EXPORT, line).group(1).replace(" ", "").split(";"))
         else:
@@ -156,9 +158,7 @@ class PolicyParser:
             raise errors.ActionParseError("Failed to parse actions {}".format(actions))
 
     def decomposeExpression(self, text, defaultRule=False):
-
         def _getFirstGroup(text):
-
             brc = 0  # brace count
             gotgroup = False
 
@@ -176,7 +176,6 @@ class PolicyParser:
                 beg = text[i:]
                 if beg.startswith('REFINE') or beg.startswith('EXCEPT'):
                     return text[:i - 1].strip()
-
             else:
                 if brc != 0:
                     raise Exception("Brace count does not fit in rule: " + text)
@@ -215,12 +214,11 @@ class PolicyParser:
             return ([str('TO ' + f.strip()) for f in FACTOR_SPLIT_TO.split(sel)[2:]], fltr)
 
         else:
-            "TODO: make it custom error"
+            # TODO: make it custom error
             raise Exception("Can not find filter factors in: '" + sel + "' in text: " + text)
 
     def normalizeFactor(self, selector, fltr):
-        """
-        Returns (subject, filter) where subject is AS or AS-SET and
+        """Returns (subject, filter) where subject is AS or AS-SET and
         filter is a filter. For example in factor:
         "to AS1234 announce AS-SECRETNET" : the subject is AS1234 and
         the filter is the AS-SECRETNET; the same for factor:
@@ -248,9 +246,8 @@ class PolicyParser:
         raise Exception("Can not parse factor: " + factor)
 
     def parseRule(self, mytext, direction, mp):
-        """
-        Returns (afi, [(subject, filter)]). Remove all refine and except blocks
-        as well as protocol and to specs.
+        """Returns (afi, [(subject, filter)]). Remove all refine and except
+        blocks as well as protocol and to specs.
 
         The (subject, filter) are taken from factors where subject is
         AS or AS-SET and filter is a filter string. For example in factor:
@@ -262,7 +259,6 @@ class PolicyParser:
         afi is by default ipv4.unicast. For MP rules it is being parsed and
         filled in according to the rule content.
         """
-
         afi = 'IPV4.UNICAST'
 
         if mp:
@@ -286,8 +282,7 @@ class PolicyParser:
         return (direction, afi, [self.normalizeFactor(f, factors[1]) for f in factors[0]])
 
     def interpreter(self, mytext, rule, mp=False):
-        """
-        Analyse and interpret the rule.
+        """Analyse and interpret the rule.
 
         subject = AS that is announcing the prefix to or as that the prefix is exported to by
         the AS that conains this rule
@@ -318,10 +313,8 @@ class PolicyParser:
         #             ((not ipv6) and res[1] != 'IPV4.UNICAST')):
         #         raise errors.InterpreterError("AFI does not match.")
 
-        """
-            Separation of roles. The peer class will get a pointer to the filter (hash value)
-            while the real filter will be stored temporarily for the second round of resolving.
-        """
+        # Separation of roles. The peer class will get a pointer to the filter (hash value)
+        # while the real filter will be stored temporarily for the second round of resolving.
         if res[2][0][1] != 'ANY':
             # Create a hash of the filter expression
             ha = str(xxhash.xxh64(res[2][0][1]).hexdigest())
@@ -364,10 +357,9 @@ class PolicyParser:
             possible_ips = re.search(FIND_IP_FACTOR2, mytext)
         else:
             possible_ips = re.search(FIND_IP_FACTOR1, mytext)
-            """ === warning ===
-                In case of peering on multiple network edges,
-                more peering-IPs are present in the policy!!!
-            """
+            # XXX === warning ===
+            #    In case of peering on multiple network edges,
+            #    more peering-IPs are present in the policy!!!
         if possible_ips is not None and len(possible_ips.group("something")) > 2:
             try:
                 self.extractIPs(mytext, pp, mp)
@@ -381,119 +373,83 @@ class PolicyParser:
         self.peerings.appentPeering(peer_as)
 
 
-class ASNParser:
-    def __init__(self, ASNObject, ipv6):
-        self.ASNobj = ASNObject
-        self.ipv4 = True
-        self.ipv6 = ipv6
+def parse_AS_routes(xml_resp, ipv4=True, ipv6=True):
+    """Parses the XML response in-place and returns the ipv4/ipv6 routes."""
+    routes = {'ipv4': set(), 'ipv6': set()}
+    try:
+        xml_resp = StringIO(xml_resp)
+        context = et.iterparse(xml_resp, events=('start', 'end'))
+        context = iter(context)
+        _, root = context.next()
+        in_primary_key = False
+        for event, elem in context:
+            if event == 'start' and elem.tag == 'primary-key':
+                in_primary_key = True
+            elif event == 'end':
+                if elem.tag == 'attribute' and in_primary_key:
+                        continue
+                elif elem.tag == 'primary-key':
+                    for child_elem in elem:
+                        if ipv4 and child_elem.attrib.get('name') == 'route':
+                            route = child_elem.attrib.get('value')
+                            routes['ipv4'].add(route)
+                        elif ipv6 and child_elem.attrib.get('name') == 'route6':
+                            route = child_elem.attrib.get('value')
+                            routes['ipv6'].add(route)
+                    in_primary_key = False
+                # Keeps the generated tree empty.
+                elem.clear()
+                root.clear()
+    finally:
+        xml_resp.close()
 
-    def extractRoutes(self, db_object):
-
-        # TODO, this function needs improvements
-        if self.ipv4:
-            for elem in db_object.iterfind('./objects/object[@type="route"]/primary-key'):
-                new_prefix = None
-                new_origin = None
-
-                for subelem in elem.iterfind('./attribute[@name="route"]'):
-                    new_prefix = subelem.attrib.get("value")
-                for subelem in elem.iterfind('./attribute[@name="origin"]'):
-                    new_origin = subelem.attrib.get("value")
-                if new_prefix is not None and new_origin is not None:
-                    self.ASNobj.routeObjDir.appendRouteObj(rpsl.RouteObject(new_prefix, new_origin))
-                else:
-                    raise errors.ASNParserError("Prefix or Origin could not be found")
-
-        if self.ipv6:
-            for elem in db_object.iterfind('./objects/object[@type="route6"]/primary-key'):
-                new_prefix = None
-                new_origin = None
-                for subelem in elem.iterfind('./attribute[@name="route6"]'):
-                    new_prefix = subelem.attrib.get("value")
-                for subelem in elem.iterfind('./attribute[@name="origin"]'):
-                    new_origin = subelem.attrib.get("value")
-                if new_prefix is not None and new_origin is not None:
-                    self.ASNobj.routeObjDir.appendRouteObj(rpsl.Route6Object(new_prefix, new_origin))
-                else:
-                    raise errors.ASNParserError("Prefix or Origin could not be found")
+    return routes
 
 
-class ASSetParser:
-    def __init__(self, AsSetObject):
-        self.setObj = AsSetObject
-
-    def parseMembers(self, db_object, old_ASNDir, old_ASSetDir):
-
-        new_ASSet = set()
-        new_ASNset = set()
-
-        for elem in db_object.iterfind('./objects/object[@type="as-set"]/attributes'):
-            for subelem in elem.iterfind('./attribute[@name="members"]'):
-                val = subelem.attrib.get("value")
-
-                if rpsl.is_ASN(val):
-                    self.setObj.ASNmembers.add(val)
-                    try:
-                        old_ASNDir.asnObjDir[val]
-                    except KeyError:
-                        new_ASNset.add(val)
-                        pass
-
-                elif rpsl.is_AS_set(val):
-                    self.setObj.ASSetmember.add(val)
-                    try:
-                        old_ASSetDir.asSetObjDir[val]
-                    except KeyError:
-                        new_ASSet.add(val)
-
-        old_ASSetDir.appendAsSetObj(self.setObj)
-        return new_ASSet, new_ASNset
+def parse_AS_set_members(xml_resp):
+    """Parses the XML response and returns the AS set's members."""
+    db_object = et.fromstring(xml_resp)
+    AS_sets = set()
+    ASNs = set()
+    for elem in db_object.iterfind('./objects/object[@type="as-set"]/attributes'):
+        for subelem in elem.iterfind('./attribute[@name="members"]'):
+            val = subelem.attrib.get("value")
+            if rpsl.is_ASN(val):
+                ASNs.add(val)
+            elif rpsl.is_AS_set(val):
+                AS_sets.add(val)
+    return AS_sets, ASNs
 
 
-class RSSetParser:
-    def __init__(self, RouteSetObject, ipv6):
-        self.setObj = RouteSetObject
-        self.ipv4_enabled = True
-        self.ipv6_enabled = ipv6
+def parse_RS_members(xml_resp, ipv4=True, ipv6=True):
+    """Parses the XML response in-place and returns the RS' members."""
+    RSes = set()
+    routes = {'ipv4': set(), 'ipv6': set()}
 
-    def parseMembers(self, db_object, old_RSSetDir):
+    try:
+        xml_resp = StringIO(xml_resp)
+        context = et.iterparse(xml_resp, events=('start', 'end'))
+        context = iter(context)
+        _, root = context.next()
+        for event, elem in context:
+            if event == 'end':
+                if elem.tag == 'attribute' and elem.attrib.get('name'):
+                    if (elem.attrib.get('name') == 'members' or
+                            elem.attrib.get('name') == 'mp-members'):
+                        member = elem.attrib.get('value')
+                        # XXX The following should be used instead but change needs time
+                        # if rpsl.is_rs_set_with_range(member):
+                        if rpsl.is_rs_set(member):
+                            RSes.add(member)
+                        elif ipv4 and tools.is_valid_ipv4_with_range(member):
+                            routes['ipv4'].add(member)
+                        elif ipv6 and tools.is_valid_ipv6_with_range(member):
+                            routes['ipv6'].add(member)
 
-        new_RSSet = set()
-        # TODO, this function needs improvements
-        if self.ipv4_enabled:
-            for elem in db_object.iterfind('./objects/object[@type="route-set"]/attributes'):
-                for subelem in elem.iterfind('./attribute[@name="members"]'):
-                    new_member = subelem.attrib.get("value").strip()
+                # Keeps the generated tree empty.
+                elem.clear()
+                root.clear()
+    finally:
+        xml_resp.close()
 
-                    if rpsl.is_rs_set(new_member):
-                        self.setObj.RSSetsDir.add(new_member)
-                        try:
-                            old_RSSetDir.RouteSetObjDir[new_member]
-                        except KeyError:
-                            new_RSSet.add(new_member)
-                            pass
-
-                    else:
-                        ro = rpsl.RouteObject(new_member, self.setObj.route_set)
-                        self.setObj.members.appendRouteObj(ro)
-
-        if self.ipv6_enabled:
-            # WROOONG IPv6 is not MP
-            for elem in db_object.iterfind('./objects/object[@type="route-set"]/attributes'):
-                for subelem in elem.iterfind('./attribute[@name="mp-members"]'):
-                    new_member = subelem.attrib.get("value").strip()
-
-                    if rpsl.is_rs_set(new_member):
-                        self.setObj.RSSetsDir.add(new_member)
-                        try:
-                            old_RSSetDir.RouteSetObjDir[new_member]
-                        except KeyError:
-                            new_RSSet.add(new_member)
-                            pass
-
-                    else:
-                        ro = rpsl.Route6Object(new_member, "None")
-                        self.setObj.mp_members.appendRouteObj(ro)
-
-        old_RSSetDir.appendRouteSetObj(self.setObj)
-        return new_RSSet
+    return RSes, routes

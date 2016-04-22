@@ -7,16 +7,17 @@ import errors
 ASN_MATCH = re.compile('^AS[0-9]+$')
 PFX_FLTR_MATCH = re.compile('^\{([^}]*)\}(\^[0-9+-]+)?$')
 PFX_MATCH = re.compile('^([0-9A-F:\.]+/[0-9]+)(\^[0-9+-]+)?$')
-PFX_RANGE_OPERATOR = re.compile('^\^[0-9+-]+$')
+RANGE_OPERATOR = re.compile('^\^[0-9+-]+$')
 AS_SET_MATCH = re.compile('^(?:AS\d+:)*(?:AS-(?:\w|-)+:?)+(?::AS\d+)*$')
 RS_SET_MATCH = re.compile('^(?:AS\d+:)*(?:RS-(?:\w|-)+:?)+(?::AS\d+)*$')
+RS_SET_WITH_RANGE_MATCH = re.compile('^(?:AS\d+:)*(?:RS-(?:\w|-)+:?)+(?::AS\d+)*(?:\^[0-9+-]+)?$')
 RTR_SET_MATCH = re.compile('^(?:AS\d+:)*(?:RTR-(?:\w|-)+:?)+(?::AS\d+)*$')
 FLTR_SET_MATCH = re.compile('^(?:AS\d+:)*(?:FLTR-(?:\w|-)+:?)+(?::AS\d+)*$')
 
 
 regex_ops = '(?:(?:\?|~?(?:\*|\+)?)|~?\{\d+(?:,\d*)?\})?'
-AS_PATH_MEMBER_MATCH = [  # ASN with regex operators
-                          re.compile("^\^?{asn}{regexops}\$?$".format(asn='[[^]{0,2}AS[0-9]+\]?', regexops=regex_ops)),
+AS_PATH_MEMBER_MATCH = [  # ASN or set of ASNs with regex operators
+                        re.compile("^\^?{asn}{regexops}\$?$".format(asn='[[^]{0,2}AS[0-9]+\]?', regexops=regex_ops)),
                         # AS_SET with regex operators
                         re.compile("^\^?{as_set}{regexops}\$?$".format(as_set='(?:AS\d+:)*(?:AS-(?:\w|-)+:?)+(?::AS\d+)*', regexops=regex_ops)),
                         # '.' with regex operators
@@ -35,8 +36,8 @@ def is_pfx(value):
     return PFX_MATCH.match(value) is not None
 
 
-def is_pfx_range_operator(value):
-    return PFX_RANGE_OPERATOR.match(value) is not None
+def is_range_operator(value):
+    return RANGE_OPERATOR.match(value) is not None
 
 
 def is_AS_set(value):
@@ -49,6 +50,10 @@ def is_rtr_set(value):
 
 def is_rs_set(value):
     return RS_SET_MATCH.match(value) is not None
+
+
+def is_rs_set_with_range(value):
+    return RS_SET_WITH_RANGE_MATCH.match(value) is not None
 
 
 def is_fltr_set(value):
@@ -144,6 +149,7 @@ class ASNObject(RpslObject):
 
     def __init__(self, asnum):
         self.origin = asnum
+        # self.hash = hv
         self.routeObjDir = RouteObjectDir()
 
     def getKey(self):
@@ -163,7 +169,6 @@ class ASNObject(RpslObject):
 
 
 class ASNObjectDir:
-
     def __init__(self):
         self.asnObjDir = {}
 
@@ -203,6 +208,7 @@ class AsSetObject(RpslObject):
     def __init__(self, setname):
         RpslObject.__init__(self)
         self.as_set = setname
+        # self.hash = hv
         self.ASNmembers = set()
         self.ASSetmember = set()
 
@@ -280,6 +286,7 @@ class RouteSetObject(RpslObject):
     def __init__(self, setname):
         RpslObject.__init__(self)
         self.route_set = setname
+        # self.hash = hv
         self.members = RouteObjectDir()
         self.mp_members = RouteObjectDir()
         self.RSSetsDir = set()
@@ -297,9 +304,6 @@ class RouteSetObjectdir:
 
     def appendRouteSetObj(self, RouteSetObject):
         self.RouteSetObjDir[RouteSetObject.getKey()] = RouteSetObject
-
-##################
-##################
 
 
 class PeerAS:
