@@ -92,7 +92,6 @@ class RouteObject(RpslObject):
 
     ROUTE_ATTR = 'ROUTE'
     ORIGIN_ATTR = 'ORIGIN'
-    # MEMBEROF_ATTR = 'MEMBER-OF'
 
     def __init__(self, route, origin):
         self.route = route
@@ -135,12 +134,6 @@ class RouteObjectDir(object):
         else:
             raise errors.AppendFilterError('Failed to insert Route object to dictionary')
 
-    # def checkRouteExists(self, route, v6=False):
-    #     if v6:
-            #         return route in self.origin_table_v6
-    #     else:
-            #         return route in self.origin_table
-
 
 class ASObject(RpslObject):
     """
@@ -159,12 +152,6 @@ class ASObject(RpslObject):
 
     def append_route_obj(self, route_object):
         self.route_obj_dir[route_object.get_key()] = route_object
-
-        # def ASN_has_route(self, route_object, v6=False):
-    #     if v6:
-        #         return route_object.get_key() in self.route_obj_dir.origin_table_v6
-    #     else:
-        #         return route_object.get_key() in self.route_obj_dir.origin_table
 
 
 class AsnObjectDir:

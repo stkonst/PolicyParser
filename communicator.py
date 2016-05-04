@@ -57,6 +57,9 @@ class Communicator():
         return db_reply
 
     def get_routes_by_autnum(self, autnum, ipv6_enabled=False):
+        #
+        # For a given AS number, it requests all the route[6] objects.
+        #
         db_reply = None
         if ipv6_enabled:
             url = self._search_URL_builder(autnum, "origin", ("route", "route6"), self.flags)
@@ -73,6 +76,7 @@ class Communicator():
 
     def _search_URL_builder(self, query_string, inverse_attribute, type_filters, flags):
         """
+        Builds the url that is required by the search service of the RIPE API
         Example:
             http://rest.db.ripe.net/search.xml?query-string=as199664&type-filter=route6&inverse-attribute=origin
         """
@@ -92,6 +96,10 @@ class Communicator():
         return self.db_url + ''.join(new_url)
 
     def _send_DB_request(self, db_url):
+        #
+        # The passed URL is being sent to the RIPE DB. The function raises a custom error based on API's error list
+        # in case of receiving the non-expected status code.
+        #
         retries = self.max_retries
         while True:
             try:

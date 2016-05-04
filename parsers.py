@@ -65,6 +65,9 @@ class PolicyParser:
             raise Exception('Failed to load DB content in XML format')
 
     def read_policy(self):
+        #
+        # Retrieves the imports/exports of the policy and passes them to the interpreter
+        #
         logging.debug('Will parse policy for {}'.format(self.autnum))
         for elem in self.et_content.iterfind('./objects/object[@type="aut-num"]/attributes/attribute'):
             if "import" == elem.attrib.get("name"):
@@ -96,7 +99,7 @@ class PolicyParser:
                     logging.error("Failed to parse mp-export [{}]".format(elem.attrib.get("value")))
 
     def extract_IPs(self, policy_object, peering_point, mp=False):
-        """RPSL Allows also 1 out of the 2 IPs to exist."""
+        """NOTICE: RPSL Allows also 1 out of the 2 IPs to exist."""
 
         items = re.search(IP_EXTRACT_RE, policy_object)
 
@@ -120,6 +123,11 @@ class PolicyParser:
             raise errors.IPparseError("Failed to parse IP values")
 
     def extract_actions(self, line, policy_action_list, export=False):
+
+        #
+        # Discovers and extracts the actions from an rpsl expression. Then creates  actions lists and appends the
+        # actions with their values.
+        #
         if export:
             actions = filter(None, re.search(EXTRACT_ACTIONS_EXPORT, line).group(1).replace(" ", "").split(";"))
         else:
@@ -132,7 +140,7 @@ class PolicyParser:
                     val = re.search(ACTION_COMMUNITY_APPEND, action).group(1)
                     if val is not None:
                         if "," in val:
-                            # Multiple values of community exist
+                            # Multiple values of community may exist
                             mval = val.split(",")
                             for c in mval:
                                 policy_action_list.append_action(rpsl.PolicyAction(i, "community", "append", c))
@@ -142,7 +150,7 @@ class PolicyParser:
                         val = re.search(ACTION_COMMUNITY_DELETE, action).group(1)
                         if val is not None:
                             if "," in val:
-                                # Multiple values of community exist
+                                # Multiple values of community may exist
                                 mval = val.split(",")
                                 for c in mval:
                                     policy_action_list.append_action(rpsl.PolicyAction(i, "community", "delete", c))
@@ -304,17 +312,10 @@ class PolicyParser:
             peer_as = self.peerings.return_peering(res[2][0][0])
         except errors.ASDiscoveryError:
             peer_as = rpsl.PeerAS(res[2][0][0])
-            # logging.debug('New peering found (%s)' % res[2][0][0])
-            pass
-
-        # Check address family matches
-        # if res[1] != 'ANY' and res[1] != 'ANY.UNICAST':
-        #     if ((ipv6 and res[1] != 'IPV6.UNICAST') or
-        #             ((not ipv6) and res[1] != 'IPV4.UNICAST')):
-        #         raise errors.InterpreterError("AFI does not match.")
 
         # Separation of roles. The peer class will get a pointer to the filter (hash value)
         # while the real filter will be stored temporarily for the second round of resolving.
+
         if res[2][0][1] != 'ANY':
             # Create a hash of the filter expression
             ha = str(xxhash.xxh64(res[2][0][1]).hexdigest())
@@ -357,7 +358,7 @@ class PolicyParser:
             possible_ips = re.search(FIND_IP_FACTOR2, rule)
         else:
             possible_ips = re.search(FIND_IP_FACTOR1, rule)
-            # XXX === warning ===
+            # XXX === WARNING ===
             #    In case of peering on multiple network edges,
             #    more peering-IPs are present in the policy!!!
         if possible_ips is not None and len(possible_ips.group("something")) > 2:

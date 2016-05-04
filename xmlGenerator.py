@@ -10,6 +10,8 @@ class XmlGenerator:
 
     def _get_action_template(self, policy_action_list):
 
+        """Converts the policy actions of a peering point into XML format """
+
         if policy_action_list.direction == "import":
             new_actions = et.Element('actions_in')
         elif policy_action_list.direction == "export":
@@ -48,6 +50,7 @@ class XmlGenerator:
         return new_prefix
 
     def get_policy_template(self, autnum):
+        """Builds the basic high level structure of the XML document"""
         template_root = et.Element('root')
 
         template_root.append(et.Comment('This is a resolved XML policy file for {}'.format(autnum)))
@@ -84,6 +87,7 @@ class XmlGenerator:
         return fltr_root
 
     def _AS_to_XML(self, AS_object, pl):
+        """Converts a given AS number into a prefix list with ipv4/ipv6 prefixes"""
         for r in AS_object.route_obj_dir.origin_table.itervalues():
             et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
 
