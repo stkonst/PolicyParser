@@ -1,4 +1,3 @@
-__author__ = 'George Thessalonikefs (george@nlnetlabs.nl) '
 import re
 from collections import namedtuple
 
@@ -25,9 +24,9 @@ ops = {
 
 
 def _explode_filter(filter_text):
-    """Explodes the characters in the filter that signify the start/end position
-    of certain elements. This will help identify the different elements during
-    the Shunting-Yard algorithm.
+    """Explodes the characters in the filter that signify the start/end
+    position of certain elements. This will help identify the different
+    elements during the Shunting-Yard algorithm.
 
     These elements are groups (surrounded by parentheses), as-paths (surrounded
     by angle brackets) and prefix lists (surrounded by curly brackets).
@@ -58,27 +57,27 @@ def _explode_filter(filter_text):
     # Below is the procedure to differentiate prefix lists from regex range
     # operators and explode the former.
 
-    # Holds the number of extra space inserted while exploding. Helps navigating
-    # the ever-increasing in length filter_text.
+    # Holds the number of extra space inserted while exploding. Helps
+    # navigating the ever-increasing in length filter_text.
     adj = 0
 
-    # Points to the current selection end (regex range operator OR prefix list).
+    # Points to the current selection end (regex range operator or prefix
+    # list).
     range_end = -1
     for i, char in list(enumerate(filter_text)):
         i += adj
 
         # Ignore characters until the selection end. It doesn't add the 'adj'
-        # value in  order to ignore the closing curly bracket of the regex range
+        # value in order to ignore the closing curly bracket of the regex range
         # operator but not of the prefix list.
         if i <= range_end:
             continue
 
         if char == PREFIX_START:
-            # print "Found character: {}".format(filter_text)
-            # print "                 {}{}".format(' '*(i), '^')
             range_end = filter_text.find(PREFIX_END, i)
             if range_end == -1:
-                raise errors.FilterAnalysisError("Non matching curly brackets!")
+                raise errors.FilterAnalysisError("Non matching curly "
+                                                 "brackets!")
 
             # If the enclosing value is not a regex range operator explode the
             # left curly bracket.
@@ -86,15 +85,10 @@ def _explode_filter(filter_text):
                 filter_text = filter_text[:i] + ' ' + char + ' ' + filter_text[i + 1:]
                 adj += 2
 
-                # print "Result:          {}".format(filter_text)
-                # print
-
         # The right curly brackets are only cases of prefix lists. The closing
         # curly brackets of regex range operators are ignored based on the
         # range_end character skipping above.
         elif char == PREFIX_END:
-            # print "Found character: {}".format(filter_text)
-            # print "                 {}{}".format(' '*(i), '^')
             # We make the assumption that the end of the prefix list (with or
             # without an outer range operator) is separated by space from the
             # next element.
@@ -114,9 +108,6 @@ def _explode_filter(filter_text):
             else:
                 filter_text = filter_text[:i] + ' ' + filter_text[i:]
                 adj += 1
-
-                # print "Result:          {}".format(filter_text)
-                # print
 
     return filter_text
 
@@ -154,8 +145,8 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
     inside_PREFIX = False
     identified_tokens = []
 
-    # Used to determine if the previously pushed identified token
-    # was an operator (e.g., 'OR') or a term (e.g., AS, AS-PATH, group of terms)
+    # Used to determine if the previously pushed identified token was an
+    # operator (e.g., 'OR') or a term (e.g., AS, AS-PATH, group of terms).
     pushed_term = False
 
     tokens = _explode_filter(filter_text).strip().split()
@@ -170,8 +161,9 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
 
         elif inside_ASPATH:
             if not rpsl.is_as_path_member(token):
-                raise errors.FilterAnalysisError(
-                    "'{}' is not a valid member of AS-PATH!".format(token))
+                raise errors.FilterAnalysisError("Not a valid member of "
+                                                 "AS-PATH: "
+                                                 "'{}'!".format(token))
 
             identified_tokens[-1][1].append(token)
             pushed_term = False
@@ -193,7 +185,9 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
                 token = l
 
             if not rpsl.is_pfx(token):
-                raise errors.FilterAnalysisError("Invalid member '{}' inside PREFIX list!".format(token))
+                raise errors.FilterAnalysisError("Invalid member inside "
+                                                 "PREFIX list: "
+                                                 "'{}'!".format(token))
 
             identified_tokens[-1][1].append(token)
             pushed_term = False
@@ -203,7 +197,8 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
             pushed_term = False
 
         elif token == GROUP_END:
-            identified_tokens.append((token, op_details(precedence=0, associativity='Left')))
+            identified_tokens.append(
+                (token, op_details(precedence=0, associativity='Left')))
             pushed_term = True
 
         else:
@@ -215,7 +210,8 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
                 pushed_term = False
 
             elif token == GROUP_START:
-                identified_tokens.append((token, op_details(precedence=0, associativity='Left')))
+                identified_tokens.append(
+                    (token, op_details(precedence=0, associativity='Left')))
                 pushed_term = False
 
             elif token == ASPATH_START:
@@ -248,7 +244,8 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
                 pushed_term = True
 
             else:
-                raise errors.UnimplementedError("Element '{}' is not implemented!".format(token))
+                raise errors.UnimplementedError("Not implemented element: "
+                                                "'{}'!".format(token))
 
     if inside_ASPATH:
         raise errors.FilterAnalysisError("AS-PATH is not closed!")
@@ -287,7 +284,8 @@ def _shunting_yard(tokens):
             operator_stack.append((desc, value))
 
         elif desc == GROUP_END:
-            # Right parentheses exhaust the stack until the left parentheses is found.
+            # Right parentheses exhaust the stack until the left parentheses is
+            # found.
             found_matching_parentheses = False
             while operator_stack:
                 operator_2 = operator_stack.pop()
@@ -305,7 +303,8 @@ def _shunting_yard(tokens):
             op1_prec, op1_assoc = value
             while operator_stack:
                 _, (op2_prec, _) = operator_stack[-1]
-                if (op1_assoc == 'Left' and op1_prec <= op2_prec) or (op1_assoc == 'Right' and op1_prec < op2_prec):
+                if ((op1_assoc == 'Left' and op1_prec <= op2_prec) or
+                        (op1_assoc == 'Right' and op1_prec < op2_prec)):
                     output_queue.append(operator_stack.pop())
                 else:
                     break
@@ -326,8 +325,8 @@ def _shunting_yard(tokens):
 
 
 def analyze_filter(filter_text):
-    """Analyzes the filter and runs the Shunting-Yard algorithm to produce a LIFO
-    queue that can be used for evaluation.
+    """Analyzes the filter and runs the Shunting-Yard algorithm to produce a
+    LIFO queue that can be used for evaluation.
 
     Parameters
     ----------
@@ -359,7 +358,8 @@ def analyze_filter(filter_text):
 
 
 def compose_filter(output_queue):
-    """Composes the required filter structure from the Shunting-Yard algorithm output.
+    """Composes the required filter structure from the Shunting-Yard algorithm
+    output.
 
     Parameters
     ----------
@@ -392,7 +392,7 @@ if __name__ == "__main__":
     TEST_STRING = TEST_STRING_6
 
     out, ases, assets, rssets = analyze_filter(TEST_STRING)
-    print "out: {}".format([ desc if desc in ops else value for desc, value in out])
+    print "out: {}".format([desc if desc in ops else value for desc, value in out])
     # compose_filters(out)
     # print "\n \n"
     # print "out: {}".format([desc for desc, value in out])

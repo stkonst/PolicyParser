@@ -17,21 +17,23 @@ def read_blisted(AS_list):
     items = set(AS_list.split(","))
     for i in items:
         if not rpsl.is_ASN(i):
-            print "{} is not a valid AS number".format(i)
+            print "{} is not a valid AS number!".format(i)
             exit(1)
     return items
 
 
 def build_XML_policy(autnum, ipv6=True, output='screen'):
     #
-    # PreProcess section: Get own policy, parse and create necessary Data Structures.
+    # PreProcess section: Get own policy, parse and create necessary Data
+    #                     Structures.
     #
     com = communicator.Communicator()
     pp = parsers.PolicyParser(autnum)
 
     pp.assign_content(com.get_policy_by_autnum(autnum))
     pp.read_policy()
-    logging.debug("Found {} expressions to resolve.".format(pp.filter_expressions.number_of_filters()))
+    logging.debug("Expressions to resolve: "
+                  "{}".format(pp.filter_expressions.number_of_filters()))
     if pp.filter_expressions.number_of_filters() < 1:
         print("No filter expressions found.")
         return None
@@ -49,7 +51,8 @@ def build_XML_policy(autnum, ipv6=True, output='screen'):
     xmlgen = xmlGenerator.XmlGenerator(autnum)
     xmlgen.convert_peers_to_XML(pp.peerings)
     xmlgen.convert_filters_to_XML(pp.filter_expressions)
-    xmlgen.convert_lists_to_XML(fr.AS_list, fr.AS_dir, fr.RS_list, fr.RS_dir, fr.AS_set_list, fr.AS_set_dir)
+    xmlgen.convert_lists_to_XML(fr.AS_list, fr.AS_dir, fr.RS_list, fr.RS_dir,
+                                fr.AS_set_list, fr.AS_set_dir)
 
     if output == "browser":
         return xmlgen.__str__()
@@ -83,7 +86,8 @@ if __name__ == "__main__":
                 params["ipv6"] = "True"
 
             if arg == "-b":
-                # Comma seperated list of AS numbers that we don't want to resolve (blacklisted)
+                # Comma seperated list of AS numbers that we don't want to
+                # resolve (blacklisted).
                 black_list = read_blisted(sys.argv[sys.argv.index('-b') + 1])
 
     print("Configuration done. Starting...")
@@ -91,8 +95,10 @@ if __name__ == "__main__":
     if starting_flag:
         logging.getLogger("requests").setLevel(logging.WARNING)
         if "output_file" in params:
-            logging.basicConfig(filename=params["output_file"] + '.log', level=logging.DEBUG)
-            xml_result = build_XML_policy(params.get("as_number"), output='file')
+            logging.basicConfig(filename=params["output_file"] + '.log',
+                                level=logging.DEBUG)
+            xml_result = build_XML_policy(params.get("as_number"),
+                                          output='file')
             if xml_result:
                 f = open(params["output_file"], mode='w')
                 f.write(xml_result)
@@ -102,4 +108,3 @@ if __name__ == "__main__":
             print build_XML_policy(params.get("as_number"), output='screen')
 
         logging.info("All done. XML policy is ready.")
-

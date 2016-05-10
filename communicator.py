@@ -8,9 +8,11 @@ import errors
 class Communicator():
     ripe_db_url = "http://rest.db.ripe.net"
     default_db_source = "ripe"
-    alternative_db_sources = ("RADB-GRS", "APNIC-GRS", "ARIN-GRS", "LACNIC-GRS", "AFRINIC-GRS", "JPIRR-GRS")
+    alternative_db_sources = ("RADB-GRS", "APNIC-GRS", "ARIN-GRS",
+                              "LACNIC-GRS", "AFRINIC-GRS", "JPIRR-GRS")
 
-    def __init__(self, db_url=ripe_db_url, source=default_db_source, alternatives=alternative_db_sources):
+    def __init__(self, db_url=ripe_db_url, source=default_db_source,
+                 alternatives=alternative_db_sources):
         def _get_alternatives(alternatives):
             s = []
             for i in alternatives:
@@ -26,62 +28,67 @@ class Communicator():
         self.flags.add('no-referenced')
 
         # (TCP keep-alive) Used when we have a not-yet-known closed session.
-        # The server closes the connection, but we already have a request in the
-        # wire. This results in requests.ConnectionError by the server. By
+        # The server closes the connection, but we already have a request in
+        # the wire. This results in requests.ConnectionError by the server. By
         # retrying we eventually open another connection.
         self.max_retries = 3
 
     def get_policy_by_autnum(self, autnum):
         db_reply = None
         try:
-            db_reply = self._send_DB_request(self._search_URL_builder(autnum, None, (), self.flags))
+            url = self._search_URL_builder(autnum, None, (), self.flags)
+            db_reply = self._send_DB_request(url)
             logging.debug("Policy received for {}".format(autnum))
         except errors.RIPEDBError:
-            logging.error("Failed to receive policy for {} due to RIPE DB error.".format(autnum))
+            logging.error("Failed to receive policy for "
+                          "{} due to RIPE DB error.".format(autnum))
         except errors.SendRequestError as e:
             logging.error('Get policy failed. {}'.format(e))
 
         return db_reply
 
     def get_filter_set(self, value):
-        #
-        # Can make requests for as-set, route-set
-        #
+        """Makes requests for as-set, route-set."""
         db_reply = None
         try:
-            db_reply = self._send_DB_request(self._search_URL_builder(value, None, (), self.flags))
+            url = self._search_URL_builder(value, None, (), self.flags)
+            db_reply = self._send_DB_request(url)
         except errors.RIPEDBError:
-            logging.error('Get Filter failed for {} due to RIPE DB error.'.format(value))
+            logging.error('Get Filter failed for '
+                          '{} due to RIPE DB error.'.format(value))
         except errors.SendRequestError as e:
             logging.error('Get all routes failed for {}. {}'.format(value, e))
         return db_reply
 
     def get_routes_by_autnum(self, autnum, ipv6_enabled=False):
-        #
-        # For a given AS number, it requests all the route[6] objects.
-        #
+        """Requests all the route[6] objects for a given AS number."""
         db_reply = None
         if ipv6_enabled:
-            url = self._search_URL_builder(autnum, "origin", ("route", "route6"), self.flags)
+            url = self._search_URL_builder(autnum, "origin",
+                                           ("route", "route6"), self.flags)
         else:
-            url = self._search_URL_builder(autnum, "origin", ("route",), self.flags)
+            url = self._search_URL_builder(autnum, "origin",
+                                           ("route",), self.flags)
 
         try:
             db_reply = self._send_DB_request(url)
         except errors.RIPEDBError:
-            logging.error('Get all routes failed for {} due to RIPE DB error'.format(autnum))
+            logging.error('Get all routes failed for '
+                          '{} due to RIPE DB error'.format(autnum))
         except errors.SendRequestError as e:
             logging.error('Get all routes failed for {}. {}'.format(autnum, e))
         return db_reply
 
-    def _search_URL_builder(self, query_string, inverse_attribute, type_filters, flags):
-        """
-        Builds the url that is required by the search service of the RIPE API
+    def _search_URL_builder(self, query_string, inverse_attribute,
+                            type_filters, flags):
+        """Builds the url that is required by the search service of the RIPE API.
         Example:
-            http://rest.db.ripe.net/search.xml?query-string=as199664&type-filter=route6&inverse-attribute=origin
+        http://rest.db.ripe.net/search.xml?query-string=as199664&type-filter=route6&inverse-attribute=origin
         """
 
-        new_url = ["/search.xml?query-string={}&source={}".format(query_string, self.source)]
+        new_url = ["/search.xml?"
+                   "query-string={}&source={}".format(query_string,
+                                                      self.source)]
         new_url.append(self.other_sources)
 
         if inverse_attribute is not None:
@@ -96,10 +103,10 @@ class Communicator():
         return self.db_url + ''.join(new_url)
 
     def _send_DB_request(self, db_url):
-        #
-        # The passed URL is being sent to the RIPE DB. The function raises a custom error based on API's error list
-        # in case of receiving the non-expected status code.
-        #
+        """The passed URL is being sent to the RIPE DEBUG. The function raises
+        a custom error based on RIPE's API error list in case of receiving a
+        non-expected status code.
+        """
         retries = self.max_retries
         while True:
             try:
@@ -107,7 +114,8 @@ class Communicator():
                 if r.status_code == 200:
                     return r.content
                 elif r.status_code == 400:
-                    logging.warning("RIPE-API: The service is unable to understand and process the request.")
+                    logging.warning("RIPE-API: The service is unable to "
+                                    "understand and process the request.")
                     raise errors.RIPEDBError("RIPE-API_ERROR_400")
                 elif r.status_code == 403:
                     logging.warning("RIPE-API: Query limit exceeded.")
@@ -122,7 +130,8 @@ class Communicator():
                     logging.warning("RIPE-API: Internal Server Error")
                     raise errors.RIPEDBError("RIPE-API_ERROR_500")
                 else:
-                    logging.warning("Unknown RIPE-API response ({})".format(r.status_code))
+                    logging.warning("Unknown RIPE-API response "
+                                    "({})".format(r.status_code))
                     raise errors.RIPEDBError("RIPE-API_ERROR_UNKNOWN")
             except requests.ConnectionError as e:
                 if retries < 1:

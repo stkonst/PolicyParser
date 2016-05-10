@@ -1,4 +1,3 @@
-__author__ = 'Stavros Konstantaras (stavros@nlnetlabs.nl)'
 import re
 
 # Python regular expressions for IPv4 and IPv6 addresses and URI-references,

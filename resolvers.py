@@ -28,7 +28,8 @@ class FilterResolver:
         self.AS_set_list = set()
 
         # Data pool that contains all the AS-SETs that we discovered
-        # (included nested ones) to minimise interaction with RIPE-DB (double resolving).
+        # (included nested ones) to minimise interaction with RIPE-DB
+        # (double resolving).
         self.AS_set_dir = rpsl.AsSetObjectDir()
 
         # Set that contains all the route sets that we discover via filter
@@ -36,7 +37,8 @@ class FilterResolver:
         self.RS_list = set()
 
         # Data pool that contains all the RS-SETs that we discovered
-        # (included nested ones) to minimise interaction with RIPE-DB (double resolving).
+        # (included nested ones) to minimise interaction with RIPE-DB
+        # (double resolving).
         self.RS_dir = rpsl.RouteSetObjectdir()
 
         # Set that contains all the ASNs that we discover via filter parsing
@@ -52,7 +54,8 @@ class FilterResolver:
 
     def resolve_filters(self):
         for pf in self.peer_filters.enumerate_objs():
-            # Analyser will analyse the filter and recognise the elements that compose it
+            # The analyser will analyse the filter and recognise the elements
+            # that compose it.
             output_queue, new_ASNs, new_AS_sets, new_RSets = analyzer.analyze_filter(pf.expression)
 
             self.AS_list.update(new_ASNs)
@@ -232,8 +235,8 @@ def _subprocess_AS_set_resolving(AS_set_list):
     AS_set_directory_lock = Lock()
 
     def _threaded_resolve_set():
-        """Get an AS set from the queue, resolve it, update the shared resources
-        with the results and repeat until signaled to stop.
+        """Get an AS set from the queue, resolve it, update the shared
+        resources with the results and repeat until signaled to stop.
         This function is going to be spawned as a thread.
         """
         while True:

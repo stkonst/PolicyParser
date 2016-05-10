@@ -9,8 +9,7 @@ class XmlGenerator:
         self.xml_policy = self.get_policy_template(self.autnum)  # Init XML Template
 
     def _get_action_template(self, policy_action_list):
-
-        """Converts the policy actions of a peering point into XML format """
+        """Converts the policy actions of a peering point into XML format."""
 
         if policy_action_list.direction == "import":
             new_actions = et.Element('actions_in')
@@ -20,11 +19,14 @@ class XmlGenerator:
         while policy_action_list.data:
             i, ac = policy_action_list.data.popitem()
             if ac.rp_operator == "append":
-                new_actions.set(ac.rp_attr.lower(), "append({})".format(ac.rp_value))
+                new_actions.set(ac.rp_attr.lower(),
+                                "append({})".format(ac.rp_value))
             elif ac.rp_operator == "delete":
-                new_actions.set(ac.rp_attr.lower(), "delete({})".format(ac.rp_value))
+                new_actions.set(ac.rp_attr.lower(),
+                                "delete({})".format(ac.rp_value))
             elif ac.rp_operator == "prepend":
-                new_actions.set(ac.rp_attr.lower(), "prepend({})".format(ac.rp_value))
+                new_actions.set(ac.rp_attr.lower(),
+                                "prepend({})".format(ac.rp_value))
             elif ac.rp_operator == "=":
                 new_actions.set(ac.rp_attr.lower(), ac.rp_value)
 
@@ -50,10 +52,11 @@ class XmlGenerator:
         return new_prefix
 
     def get_policy_template(self, autnum):
-        """Builds the basic high level structure of the XML document"""
+        """Builds the basic high level structure of the XML document."""
         template_root = et.Element('root')
 
-        template_root.append(et.Comment('This is a resolved XML policy file for {}'.format(autnum)))
+        template_root.append(et.Comment('This is a resolved XML policy file '
+                                        'for {}'.format(autnum)))
         et.SubElement(template_root, 'datetime').text = str(datetime.datetime.now())
 
         et.SubElement(template_root, 'prefix-lists')
@@ -65,15 +68,19 @@ class XmlGenerator:
         return template_root
 
     def _filter_to_XML(self, peer_filter):
-        fltr_root = et.Element('peering-filter', attrib={"hash-value": peer_filter.hash_value, "afi": peer_filter.afi})
+        fltr_root = et.Element('peering-filter',
+                               attrib={"hash-value": peer_filter.hash_value,
+                                       "afi": peer_filter.afi})
         et.SubElement(fltr_root, "expression").text = peer_filter.expression
         statement_root = et.SubElement(fltr_root, "statements")
 
         for i, t in enumerate(peer_filter.statements):
             if t.allow:
-                st = et.SubElement(statement_root, 'statement', attrib={'order': str(i), 'type': 'accept'})
+                st = et.SubElement(statement_root, 'statement',
+                                   attrib={'order': str(i), 'type': 'accept'})
             else:
-                st = et.SubElement(statement_root, 'statement', attrib={'order': str(i), 'type': 'deny'})
+                st = et.SubElement(statement_root, 'statement',
+                                   attrib={'order': str(i), 'type': 'deny'})
 
             for item in t.members:
                 if item.category == "AS_PATH":
@@ -87,7 +94,9 @@ class XmlGenerator:
         return fltr_root
 
     def _AS_to_XML(self, AS_object, pl):
-        """Converts a given AS number into a prefix list with ipv4/ipv6 prefixes"""
+        """Converts a given AS number into a prefix list with ipv4/ipv6
+        prefixes.
+        """
         for r in AS_object.route_obj_dir.origin_table.itervalues():
             et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
 
@@ -95,7 +104,9 @@ class XmlGenerator:
             et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
 
     def _route_set_to_XML(self, route_set_object, route_set_object_dir, pl):
-        """Traverses the tree created by the RSes. Ignores duplicate routes and avoids loops."""
+        """Traverses the tree created by the RSes. Ignores duplicate routes
+        and avoids loops.
+        """
         route_set_tree = deque([route_set_object.get_key()])
         traversed_route_sets = set()
         traversed_routes = set()
@@ -118,8 +129,11 @@ class XmlGenerator:
                     traversed_route_sets.add(child_set)
                     route_set_tree.extend(child_set)
 
-    def _AS_set_to_XML(self, AS_set_object, AS_object_dir, AS_set_object_dir, pl_root):
-        """Traverses the tree created by the AS sets. Ignores duplicate ASes and avoids loops."""
+    def _AS_set_to_XML(self, AS_set_object, AS_object_dir, AS_set_object_dir,
+                       pl_root):
+        """Traverses the tree created by the AS sets. Ignores duplicate ASes
+        and avoids loops.
+        """
         AS_set_tree = deque([AS_set_object.get_key()])
         traversed_AS_sets = set()
         traversed_ASes = set()
@@ -145,7 +159,8 @@ class XmlGenerator:
             pp_root = et.Element('peering-point')
 
             p = et.SubElement(pp_root, "point",
-                              attrib={"local-IP": peering_point.local_ip, "remote-IP": peering_point.remote_ip})
+                              attrib={"local-IP": peering_point.local_ip,
+                                      "remote-IP": peering_point.remote_ip})
             p.append(self._get_action_template(peering_point.actions_in))
             p.append(self._get_action_template(peering_point.actions_out))
 
@@ -190,7 +205,8 @@ class XmlGenerator:
         for p, val in peer_obj_dir.peer_table.iteritems():
             self.xml_policy.find('peering-policy').append(self.peer_to_XML(val))
 
-    def convert_lists_to_XML(self, AS_list, AS_object_dir, RS_list, route_set_object_dir, AS_set_list,
+    def convert_lists_to_XML(self, AS_list, AS_object_dir, RS_list,
+                             route_set_object_dir, AS_set_list,
                              AS_set_object_dir):
         p = self.xml_policy.find('prefix-lists')
 

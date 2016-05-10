@@ -70,15 +70,15 @@ def is_as_path_member(value):
 
 
 class RpslObject(object):
-    """ Thanks to Tomas """
+    # Thanks to Tomas
 
     def __repr__(self):
         return self.__str__()
 
     def get_key(self):
-        """
-        Returns key value that should correspond to the object key in RPSL standard view.
-        It is here for common HashObjectDirectory to use it for constructing lookup table.
+        """Returns the key value that should correspond to the object key in
+        RPSL standard view. It is here for common HashObjectDirectory to use it
+        for constructing lookup table.
         """
         raise Exception("This is abstract object. Dunno what my key is!")
 
@@ -86,9 +86,7 @@ class RpslObject(object):
 # Route object machinery
 
 class RouteObject(RpslObject):
-    """
-    Internal representation of route RPSL object.
-    """
+    """Internal representation of route RPSL object."""
 
     ROUTE_ATTR = 'ROUTE'
     ORIGIN_ATTR = 'ORIGIN'
@@ -105,20 +103,17 @@ class RouteObject(RpslObject):
 
 
 class Route6Object(RouteObject):
-    """
-    Internal representation of route6 RPSL object.
-    Thanks to Tomas
-    """
+    """Internal representation of route6 RPSL object."""
+    # Thanks to Tomas
 
     # inherit route object and change only the key attribute indicator
     ROUTE_ATTR = 'ROUTE6'
 
 
 class RouteObjectDir(object):
-    """
-    A Class for storing Route objects in a dictionary.
-    Thanks to Tomas.
-    """
+    """A Class for storing Route objects in a dictionary."""
+    # Thanks to Tomas.
+
     # TODO extend with a RouteTree to store routes in a tree based structure and provide functions for fast lookup
     def __init__(self, ipv6=True):
         self.origin_table = {}
@@ -132,13 +127,12 @@ class RouteObjectDir(object):
         elif route_object.ROUTE_ATTR == 'ROUTE':
             self.origin_table[route_object.get_key] = route_object
         else:
-            raise errors.AppendFilterError('Failed to insert Route object to dictionary')
+            raise errors.AppendFilterError('Failed to insert Route object '
+                                           'to dictionary')
 
 
 class ASObject(RpslObject):
-    """
-    Internal representation of an AS
-    """
+    """Internal representation of an AS."""
 
     def __init__(self, asnum):
         self.origin = asnum
@@ -186,7 +180,7 @@ class PolicyActionList:
 # Set-* objects
 
 class AsSetObject(RpslObject):
-    """ Internal representation of as-set RPSL object. """
+    """Internal representation of as-set RPSL object."""
 
     ASSET_ATTR = 'AS-SET'
     MEMBERS_ATTR = 'MEMBERS'
@@ -213,7 +207,7 @@ class AsSetObjectDir:
 
 
 class PeeringSetObject(RpslObject):
-    """ Internal representation of prng-set RPSL object. """
+    """Internal representation of prng-set RPSL object."""
 
     PEERINGSET_ATTR = 'PEERING-SET'
     PEERING_ATTR = 'PEERING'
@@ -233,7 +227,7 @@ class PeeringSetObject(RpslObject):
 
 
 class FilterSetObject(RpslObject):
-    """ Internal representation of filter-set RPSL object. """
+    """Internal representation of filter-set RPSL object."""
 
     FILTERSET_ATTR = 'FILTER-SET'
     FILTER_ATTR = 'FILTER'
@@ -262,7 +256,7 @@ class FilterSetObject(RpslObject):
 
 
 class RouteSetObject(RpslObject):
-    """ Internal representation of route-set RPSL object. """
+    """Internal representation of route-set RPSL object."""
 
     ROUTESET_ATTR = 'ROUTE-SET'
     MEMBERS_ATTR = 'MEMBERS'
@@ -299,9 +293,8 @@ class PeerAS:
         self.peering_points = dict()
 
     def append_filter(self, info, mp):
-
-        """ It appends only the hash value of the Peer filter
-            that has been created and stored previously.
+        """Appends only the hash value of the Peer filter that has been
+        created and stored previously.
         """
         # info set(direction, afi, hash)
 
@@ -337,7 +330,6 @@ class PeeringPoint:
         If no IPs are present then actions_in are applied in
         every ingress/egress point of the domain
         """
-
         return str(self.local_ip) + "|" + str(self.remote_ip)
 
     def __str__(self):

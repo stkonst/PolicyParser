@@ -43,8 +43,8 @@ class Condition():
 
 class Term():
     def __init__(self, allow):
-        """Term of the evaluated filter. It is a constructing part of the filter
-        and groups Conditions under the same policy.
+        """Term of the evaluated filter. It is a constructing part of the
+        filter and groups Conditions under the same policy.
 
         Parameters
         ----------
@@ -63,14 +63,18 @@ def OR(queue):
         b = queue.pop()
         b, b_has_nested_operation = execute_node(b, queue)
     except IndexError:
-        raise errors.FilterCompositionError("Not enough operands for operation <OR>!")
+        raise errors.FilterCompositionError("Not enough operands for "
+                                            "operation <OR>!")
 
     if a[0] == 'AND' and a_has_nested_operation:
-        raise errors.UnimplementedError("More depth in operations than we can handle!")
+        raise errors.UnimplementedError("More depth in operations than we "
+                                        "can handle!")
     elif b[0] == 'AND' and b_has_nested_operation:
-        raise errors.UnimplementedError("More depth in operations than we can handle!")
+        raise errors.UnimplementedError("More depth in operations than we "
+                                        "can handle!")
 
-    def evaluate_simple_operand_with_operation(simple_operand, operation, check_nested_NOT=False):
+    def evaluate_simple_operand_with_operation(simple_operand, operation,
+                                               check_nested_NOT=False):
         """Put the simple operand at the front or rear of the result depending
         on its policy.
 
@@ -81,7 +85,9 @@ def OR(queue):
             if op_term.allow:
                 result.append(op_term)
             elif check_nested_NOT and not op_term.allow:
-                raise errors.UnimplementedError("No support for nested operation which includes NOT!")
+                raise errors.UnimplementedError("No support for nested "
+                                                "operation which includes "
+                                                "NOT!")
             else:
                 result.append(op_term)
         term = Term(simple_operand.allow)
@@ -103,7 +109,9 @@ def OR(queue):
             if and_term.allow:
                 result.append(and_term)
             else:
-                raise errors.UnimplementedError("No support for nested operation which includes NOT!")
+                raise errors.UnimplementedError("No support for nested "
+                                                "operation which includes "
+                                                "NOT!")
         for or_term in or_operation:
             if or_term.allow:
                 result.appendleft(or_term)
@@ -135,7 +143,9 @@ def OR(queue):
                 if and_term.allow:
                     result.append(and_term)
                 else:
-                    raise errors.UnimplementedError("No support for nested operation which includes NOT!")
+                    raise errors.UnimplementedError("No support for nested "
+                                                    "operation which includes "
+                                                    "NOT!")
         return result
 
     result = deque()
@@ -152,7 +162,8 @@ def OR(queue):
     elif a[0] == 'OPERAND':
         simple_operands.append(a[1])
     else:
-        raise errors.FilterCompositionError("Unknown operand: '{}'".format(a[0]))
+        raise errors.FilterCompositionError("Unknown operand: "
+                                            "'{}'".format(a[0]))
 
     # Operand 'b'
     if b[0] == 'OR':
@@ -168,7 +179,8 @@ def OR(queue):
             elif temp_result[0] == 'AND':
                 result = evaluate_AND_with_OR(temp_result[1], b[1])
             else:
-                raise errors.FilterCompositionError("Unknown operation '{}'".format(temp_result[0]))
+                raise errors.FilterCompositionError("Unknown operation "
+                                                    "'{}'".format(temp_result[0]))
 
     elif b[0] == 'AND':
         has_nested_operation = True
@@ -183,7 +195,8 @@ def OR(queue):
             elif temp_result[0] == 'AND':
                 result = evaluate_AND_with_AND(b[1], temp_result[1])
             else:
-                raise errors.FilterCompositionError("Unknown operation '{}'".format(temp_result[0]))
+                raise errors.FilterCompositionError("Unknown operation "
+                                                    "'{}'".format(temp_result[0]))
 
     elif b[0] == 'OPERAND':
         if temp_result:
@@ -194,13 +207,16 @@ def OR(queue):
                 result = evaluate_simple_operand_with_operation(
                     b[1], temp_result[1], check_nested_NOT=True)
             else:
-                raise errors.FilterCompositionError("Unknown operation '{}'".format(temp_result[0]))
-        # If both operands are simple also add this to the simple_operands list.
+                raise errors.FilterCompositionError("Unknown operation "
+                                                    "'{}'".format(temp_result[0]))
+        # If both operands are simple also add this to the simple_operands
+        # list.
         else:
             simple_operands.append(b[1])
 
     else:
-        raise errors.FilterCompositionError("Unknown operand: '{}'".format(a[0]))
+        raise errors.FilterCompositionError("Unknown operand: "
+                                            "'{}'".format(a[0]))
 
     # Only True when *both* operands are simple operands. Otherwise the simple
     # operands are consumed from the operations above.
@@ -224,14 +240,18 @@ def AND(queue):
         b = queue.pop()
         b, b_has_nested_operation = execute_node(b, queue)
     except IndexError:
-        raise errors.FilterCompositionError("Not enough operands for operation <AND>!")
+        raise errors.FilterCompositionError("Not enough operands for "
+                                            "operation <AND>!")
 
     if a[0] == 'OR' and a_has_nested_operation:
-        raise errors.UnimplementedError("More depth in operations than we can handle!")
+        raise errors.UnimplementedError("More depth in operations than we can "
+                                        "handle!")
     elif b[0] == 'OR' and b_has_nested_operation:
-        raise errors.UnimplementedError("More depth in operations than we can handle!")
+        raise errors.UnimplementedError("More depth in operations than we can "
+                                        "handle!")
 
-    def evaluate_simple_operand_with_operation(simple_operand, operation, check_nested_NOT=False):
+    def evaluate_simple_operand_with_operation(simple_operand, operation,
+                                               check_nested_NOT=False):
         """If the simple operand is allowed append it to all the allowed terms,
         else put it at the start.
 
@@ -243,7 +263,9 @@ def AND(queue):
                 if op_term.allow:
                     op_term.members.append(simple_operand)
                 elif check_nested_NOT and not op_term.allow:
-                    raise errors.UnimplementedError("No support for nested operation which includes NOT!")
+                    raise errors.UnimplementedError("No support for nested "
+                                                    "operation which includes "
+                                                    "NOT!")
                 result.append(op_term)
         else:
             term = Term(simple_operand.allow)
@@ -251,7 +273,9 @@ def AND(queue):
             result.append(term)
             for op_term in operation:
                 if check_nested_NOT and not op_term.allow:
-                    raise errors.UnimplementedError("No support for nested operation which includes NOT!")
+                    raise errors.UnimplementedError("No support for nested "
+                                                    "operation which includes "
+                                                    "NOT!")
                 else:
                     result.append(op_term)
         return result
@@ -271,7 +295,9 @@ def AND(queue):
                         new_term.members.extend(or_term.members)
                         result.append(new_term)
                     else:
-                        raise errors.UnimplementedError("No support for nested operation which includes NOT!")
+                        raise errors.UnimplementedError("No support for "
+                                                        "nested operation "
+                                                        "which includes NOT!")
             else:
                 result.append(and_term)
         return result
@@ -299,8 +325,8 @@ def AND(queue):
         return result
 
     def evaluate_OR_with_OR(or_operation_1, or_operation_2):
-        """For OR's every term create new terms equal to the number of the other
-        OR's terms.
+        """For OR's every term create new terms equal to the number of the
+        other OR's terms.
 
         NOTE: All the nested OR's terms are expected to be allowed!
         """
@@ -344,7 +370,8 @@ def AND(queue):
             elif temp_result[0] == 'AND':
                 result = evaluate_AND_with_OR(temp_result[1], b[1])
             else:
-                raise errors.FilterCompositionError("Unknown operation '{}'".format(temp_result[0]))
+                raise errors.FilterCompositionError("Unknown operation "
+                                                    "'{}'".format(temp_result[0]))
 
     elif b[0] == 'AND':
         # If 'a' was a simple operand.
@@ -370,13 +397,16 @@ def AND(queue):
                 result = evaluate_simple_operand_with_operation(
                     b[1], temp_result[1])
             else:
-                raise errors.FilterCompositionError("Unknown operation '{}'".format(temp_result[0]))
-        # If both operands are simple also add this to the simple_operands list.
+                raise errors.FilterCompositionError("Unknown operation "
+                                                    "'{}'".format(temp_result[0]))
+        # If both operands are simple also add this to the simple_operands
+        # list.
         else:
             simple_operands.append(b[1])
 
     else:
-        raise errors.FilterCompositionError("Unknown operand: '{}'".format(a[0]))
+        raise errors.FilterCompositionError("Unknown operand: "
+                                            "'{}'".format(a[0]))
 
     # Only True when *both* operands are simple operands. Otherwise the simple
     # operands are consumed from the operations above.
@@ -409,10 +439,12 @@ def NOT(queue):
     try:
         a = queue.pop()
         if a[0] in ['AND', 'OR']:
-            raise errors.UnimplementedError("NOT'ing a non simple operand is not yet suported!")
+            raise errors.UnimplementedError("NOT'ing a non simple operand is "
+                                            "not yet suported!")
         a, a_has_nested_operation = execute_node(a, queue)
     except IndexError:
-        raise errors.FilterCompositionError("Not enough operands for operation <NOT>!")
+        raise errors.FilterCompositionError("Not enough operands for "
+                                            "operation <NOT>!")
 
     if a[0] in ['AND', 'OR']:
         pass
@@ -446,7 +478,8 @@ def execute_node(node, queue):
 
 
 def compose_filter(output_queue):
-    """Composes the required filter structure from the Shunting-Yard algorithm output.
+    """Composes the required filter structure from the Shunting-Yard
+    algorithm output.
 
     Parameters
     ----------
@@ -470,7 +503,8 @@ def compose_filter(output_queue):
 
     node = output_queue.pop()
     if output_queue and node[0] not in ops:
-        raise errors.FilterCompositionError("Invalid queue. The queue's tail must be an operator!")
+        raise errors.FilterCompositionError("Invalid queue. The queue's tail "
+                                            "must be an operator!")
 
     result, _ = execute_node(node, output_queue)
     if result[0] == 'OPERAND':
