@@ -55,13 +55,13 @@ class Term():
         self.members = []
 
 
-def OR(queue):
+def _OR(queue):
     """Performs the OR functionality of RPSL on the queue's next two nodes."""
     try:
         a = queue.pop()
-        a, a_has_nested_operation = execute_node(a, queue)
+        a, a_has_nested_operation = _execute_node(a, queue)
         b = queue.pop()
-        b, b_has_nested_operation = execute_node(b, queue)
+        b, b_has_nested_operation = _execute_node(b, queue)
     except IndexError:
         raise errors.FilterCompositionError("Not enough operands for "
                                             "operation <OR>!")
@@ -232,13 +232,13 @@ def OR(queue):
     return (('OR', result), has_nested_operation)
 
 
-def AND(queue):
+def _AND(queue):
     """Performs the AND functionality of RPSL on queue's next two nodes."""
     try:
         a = queue.pop()
-        a, a_has_nested_operation = execute_node(a, queue)
+        a, a_has_nested_operation = _execute_node(a, queue)
         b = queue.pop()
-        b, b_has_nested_operation = execute_node(b, queue)
+        b, b_has_nested_operation = _execute_node(b, queue)
     except IndexError:
         raise errors.FilterCompositionError("Not enough operands for "
                                             "operation <AND>!")
@@ -430,7 +430,7 @@ def AND(queue):
     return (('AND', result), has_nested_operation)
 
 
-def NOT(queue):
+def _NOT(queue):
     """Performs the NOT functionality of RPSL on queue's next node.
 
     .. warning:: Currently supports only NOT'ing a single operand.
@@ -441,7 +441,7 @@ def NOT(queue):
         if a[0] in ['AND', 'OR']:
             raise errors.UnimplementedError("NOT'ing a non simple operand is "
                                             "not yet suported!")
-        a, a_has_nested_operation = execute_node(a, queue)
+        a, a_has_nested_operation = _execute_node(a, queue)
     except IndexError:
         raise errors.FilterCompositionError("Not enough operands for "
                                             "operation <NOT>!")
@@ -465,14 +465,14 @@ def NOT(queue):
         return ((a[0], a[1]), a_has_nested_operation)
 
 
-def execute_node(node, queue):
+def _execute_node(node, queue):
     """Evaluates the current node."""
     if node[0] == 'OR':
-        return OR(queue)
+        return _OR(queue)
     elif node[0] == 'AND':
-        return AND(queue)
+        return _AND(queue)
     elif node[0] == 'NOT':
-        return NOT(queue)
+        return _NOT(queue)
     else:
         return (('OPERAND', Condition(True, node[0], node[1])), False)
 
@@ -506,7 +506,7 @@ def compose_filter(output_queue):
         raise errors.FilterCompositionError("Invalid queue. The queue's tail "
                                             "must be an operator!")
 
-    result, _ = execute_node(node, output_queue)
+    result, _ = _execute_node(node, output_queue)
     if result[0] == 'OPERAND':
         term = Term(result[1].allow)
         term.members = [result[1]]
