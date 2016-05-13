@@ -1,19 +1,9 @@
-from collections import namedtuple, deque
+from collections import deque
 import copy
 
 import errors
-import analyzer
-
-AS, AS_SET, AS_PATH, PREFIX_LIST, RS_SET = (
-    'AS AS_set  AS_PATH  prefix_list  rs_set'.split())
-
-op_details = namedtuple('op_details', 'precedence associativity')
-
-ops = {
-    'NOT': op_details(precedence=3, associativity='Right'),
-    'AND': op_details(precedence=2, associativity='Left'),
-    'OR': op_details(precedence=1, associativity='Left'),
-}
+from analyzer import (
+    AS, AS_SET, AS_PATH, PREFIX_LIST, RS_SET, ANY, op_details, ops)
 
 
 class Condition():
@@ -26,6 +16,7 @@ class Condition():
             * AS
             * AS_SET
             * AS_PATH
+            * ANY
 
         Parameters
         ----------
@@ -146,6 +137,26 @@ def _OR(queue):
                                                     "NOT!")
         return result
 
+    def handle_ANY(result):
+        """Handles ANY's existence in the result.
+
+        If ANY is a member of:
+        - an allowed term, a term with ANY as its sole member is returned as
+                           the result,
+        - a non allowed term, that term is discarded.
+        """
+        for term in result:
+            for term_member in term.members:
+                if term_member.category == ANY:
+                    if term.allow:
+                        new_term = Term(term.allow)
+                        new_term.members = [term_member]
+                        result = [new_term]
+                    else:
+                        result = [t for t in result if t != term]
+                    return result
+        return result
+
     result = deque()
     simple_operands = []
     temp_result = []
@@ -226,6 +237,8 @@ def _OR(queue):
             result.appendleft(term)
         else:
             result.append(term)
+
+    result = handle_ANY(result)
 
     return (('OR', result), has_nested_operation)
 
@@ -337,6 +350,28 @@ def _AND(queue):
                 result.append(new_term)
         return result
 
+    def handle_ANY(result):
+        """Handles ANY's existence in the result.
+
+        If ANY is a member of:
+        - an allowed term, ANY is discarded from that term,
+        - a non allowed term, a non allowed term with ANY as its sole member is
+                              returned as the result.
+        """
+        for term in result:
+            for term_member in term.members:
+                if term_member.category == ANY:
+                    if term.allow:
+                        new_term = Term(term.allow)
+                        new_term.members = [m for m in term.members if m != term_member]
+                        result = [t if t != term else new_term for t in result]
+                    else:
+                        new_term = Term(term.allow)
+                        new_term.members = [term_member]
+                        result = [new_term]
+                    return result
+        return result
+
     result = deque()
     simple_operands = []
     temp_result = []
@@ -351,7 +386,8 @@ def _AND(queue):
     elif a[0] == 'OPERAND':
         simple_operands.append(a[1])
     else:
-        raise errors.FilterCompositionError("Unknown operand: '{}'".format(a[0]))
+        raise errors.FilterCompositionError("Unknown operand: "
+                                            "'{}'".format(a[0]))
 
     # Operand 'b'
     if b[0] == 'OR':
@@ -396,7 +432,7 @@ def _AND(queue):
                     b[1], temp_result[1])
             else:
                 raise errors.FilterCompositionError("Unknown operation "
-                                                    "'{}'".format(temp_result[0]))
+                                                "'{}'".format(temp_result[0]))
         # If both operands are simple also add this to the simple_operands
         # list.
         else:
@@ -424,6 +460,8 @@ def _AND(queue):
                     result.append(term)
                 else:
                     result.appendleft(term)
+
+    result = handle_ANY(result)
 
     return (('AND', result), has_nested_operation)
 
@@ -511,74 +549,3 @@ def compose_filter(output_queue):
         return [term]
     else:
         return result[1]
-
-
-if __name__ == "__main__":
-    TEST_STRING_1 = "AS1 AND AS2 AND AS3"
-    TEST_STRING_2 = "NOT AS1 AND AS2 AND NOT AS3"
-    TEST_STRING_3 = "AS1 AND NOT AS2 AND AS3"
-
-    TEST_STRING_4 = "AS1 OR AS2 OR AS3"
-    TEST_STRING_5 = "NOT AS1 OR AS2 OR NOT AS3"
-    TEST_STRING_6 = "AS1 OR NOT AS2 OR AS3"
-
-    TEST_STRING_7 = "AS1 AND AS2 AND (AS4 OR AS5) AND NOT AS3"
-    TEST_STRING_8 = "AS1 AND NOT AS2 AND (AS4 OR NOT AS5) AND NOT AS3"
-    TEST_STRING_9 = "AS1 AND (AS2 OR AS3) AND (AS4 OR AS5)"
-    TEST_STRING_10 = "AS1 AND (AS2 OR AS3) AND AS6 AND (AS4 OR AS5)"
-    TEST_STRING_11 = "AS1 AND (AS2 OR AS3) AND NOT AS6 AND (AS4 OR AS5)"
-
-    TEST_STRING_12 = "AS1 OR AS2 OR (AS4 AND AS5) OR NOT AS3"
-    TEST_STRING_13 = "AS1 OR AS2 OR NOT AS3 OR (AS4 AND NOT AS5) OR (NOT AS6 AND AS7)"
-    TEST_STRING_14 = "AS1 OR (AS2 AND AS3) OR (AS4 AND AS5)"
-    TEST_STRING_15 = "(AS1 OR AS2) OR NOT AS3 (AS4 OR AS5) OR AS6 OR NOT AS7"
-    TEST_STRING_16 = "(AS1 AND AS2) AND NOT AS3 (AS4 AND AS5) AND AS6 AND NOT AS7"
-    TEST_STRING_17 = "(AS0 AND AS1) OR (AS2 AND AS3) OR (AS4 AND AS5)"
-    TEST_STRING_18 = "(AS0 OR AS1) AND (AS2 OR AS3) AND (AS4 OR AS5)"
-    TEST_STRING_19 = "AS1 OR (AS2 AND AS3) OR AS6 OR (AS4 AND AS5)"
-    TEST_STRING_20 = "AS1 OR (AS2 AND AS3) OR NOT AS6 OR (AS4 AND AS5)"
-    TEST_STRING_21 = "AS1 OR (AS2 AND (AS3 OR AS4)) OR NOT AS5 OR (AS6 AND AS7)"
-    TEST_STRING_22 = "AS1 AND (AS2 OR (AS3 AND AS4)) AND NOT AS5 AND (AS6 OR AS7)"
-    TEST_STRING_23 = "NOT {0.0.0.0/0} AS2 AS3"
-    TEST_STRING_24 = "<AS2$> AND AS-99"
-
-
-    TEST_STRINGS = [TEST_STRING_1, TEST_STRING_2, TEST_STRING_3, TEST_STRING_4,
-                    TEST_STRING_5, TEST_STRING_6, TEST_STRING_7, TEST_STRING_8,
-                    TEST_STRING_9, TEST_STRING_10, TEST_STRING_11, TEST_STRING_12,
-                    TEST_STRING_13, TEST_STRING_14, TEST_STRING_15, TEST_STRING_16,
-                    TEST_STRING_17, TEST_STRING_18, TEST_STRING_19, TEST_STRING_20,
-                    TEST_STRING_21, TEST_STRING_22, TEST_STRING_23, TEST_STRING_24]
-
-    for i, TEST_STRING in enumerate(TEST_STRINGS):
-        try:
-            print "--- Filter: {} ---".format(i + 1)
-            print "Input"
-            print "-----"
-            print "{}".format(TEST_STRING)
-            print
-            out, _, _, _ = analyzer.analyze_filter(TEST_STRING)
-            # print "Analyzed"
-            # print "--------"
-            # print "{}".format([ desc if desc in ops else value for desc, value in out])
-            # print
-            result = compose_filter(out)
-            # print "Result"
-            # print "------"
-            # print "{}".format(result)
-            # print
-            print "Terms"
-            print "-----"
-            for term in result:
-                print "Allow: {}".format(term.allow)
-                print "Members: {}".format([m.data for m in term.members])
-                print
-                # print "-{}".format(result[0])
-                # for x in result[1]:
-                #    traverse_result(x, 1)
-        except Exception as e:
-            print "Error: {}".format(e)
-        finally:
-            print "--------------------------------"
-            print
-            print

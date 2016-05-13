@@ -64,11 +64,11 @@ class FilterResolver:
 
             pf.statements = analyzer.compose_filter(output_queue)
 
-        print "Starting AS sets."
+        print "Resolving AS sets..."
         self._handle_AS_sets()
-        print "Starting ASes."
+        print "Resolving ASes..."
         self._handle_ASes()
-        print "Starting RS sets."
+        print "Resolving RS sets..."
         self._handle_RSes()
 
     def _handle_AS_sets(self):

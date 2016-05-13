@@ -3,25 +3,50 @@ import re
 import errors
 
 
-#  TODO Recheck all regex later for fine tuning.
-ASN_MATCH = re.compile('^AS[0-9]+$')
-PFX_FLTR_MATCH = re.compile('^\{([^}]*)\}(\^[0-9+-]+)?$')
-PFX_MATCH = re.compile('^([0-9A-F:\.]+/[0-9]+)(\^[0-9+-]+)?$')
-RANGE_OPERATOR = re.compile('^\^[0-9+-]+$')
-AS_SET_MATCH = re.compile('^(?:AS\d+:)*(?:AS-(?:\w|-)+:?)+(?::AS\d+)*$')
-RS_SET_MATCH = re.compile('^(?:AS\d+:)*(?:RS-(?:\w|-)+:?)+(?::AS\d+)*$')
-RS_SET_WITH_RANGE_MATCH = re.compile('^(?:AS\d+:)*(?:RS-(?:\w|-)+:?)+(?::AS\d+)*(?:\^[0-9+-]+)?$')
-RTR_SET_MATCH = re.compile('^(?:AS\d+:)*(?:RTR-(?:\w|-)+:?)+(?::AS\d+)*$')
-FLTR_SET_MATCH = re.compile('^(?:AS\d+:)*(?:FLTR-(?:\w|-)+:?)+(?::AS\d+)*$')
+# TODO Recheck all regex later for fine tuning.
+regex_asn = r'AS[0-9]+'
+regex_range_operator = r'\^[0-9+-]+'
+regex_pfx = r'(?:[0-9A-F:\.]+/[0-9]+)(?:' + regex_range_operator + ')?'
+regex_pfx_fltr = r'\{(?:' + regex_pfx + ',?)*\}(?:' + regex_range_operator + ')?'
+regex_as_set = r'(?:(?:' + regex_asn + ':)*(?:AS-(?:\w|-)+:?)+(?::' + regex_asn + ')*)+'
+regex_rs_set = r'(?:(?:' + regex_asn + ':)*(?:RS-(?:\w|-)+:?)+(?::' + regex_asn + ')*)+'
+regex_rs_set_with_range = regex_rs_set + r'(?:' + regex_range_operator + ')?'
+regex_rtr_set = r'(?:(?:' + regex_asn + ':)*(?:RTR-(?:\w|-)+:?)+(?::' + regex_asn + ')*)+'
+regex_fltr_set = r'(?:(?:' + regex_asn + ':)*(?:FLTR-(?:\w|-)+:?)+(?::' + regex_asn + ')*)+'
+
+ASN_MATCH = re.compile(r'^' + regex_asn + r'$')
+PFX_FLTR_MATCH = re.compile(r'^' + regex_pfx_fltr + r'$')
+PFX_MATCH = re.compile(r'^' + regex_pfx + r'$')
+RANGE_OPERATOR = re.compile(r'^' + regex_range_operator + r'$')
+AS_SET_MATCH = re.compile(r'^' + regex_as_set + r'$')
+RS_SET_MATCH = re.compile(r'^' + regex_rs_set + r'$')
+RS_SET_WITH_RANGE_MATCH = re.compile(r'^' + regex_rs_set_with_range + r'$')
+RTR_SET_MATCH = re.compile(r'^' + regex_rtr_set + r'$')
+FLTR_SET_MATCH = re.compile(r'^' + regex_fltr_set + r'$')
 
 
-regex_ops = '(?:(?:\?|~?(?:\*|\+)?)|~?\{\d+(?:,\d*)?\})?'
-AS_PATH_MEMBER_MATCH = [  # ASN or set of ASNs with regex operators
-                        re.compile("^\^?{asn}{regexops}\$?$".format(asn='[[^]{0,2}AS[0-9]+\]?', regexops=regex_ops)),
-                        # AS_SET with regex operators
-                        re.compile("^\^?{as_set}{regexops}\$?$".format(as_set='(?:AS\d+:)*(?:AS-(?:\w|-)+:?)+(?::AS\d+)*', regexops=regex_ops)),
-                        # '.' with regex operators
-                        re.compile("^\^?\.{regexops}\$?$".format(regexops=regex_ops)), ]
+regex_ops = r'(?:(?:\?|~?(?:\*|\+)?)|~?\{\d+(?:,\d*)?\})?'
+pre_member = r'[[^]{0,2}'
+after_member = r'\]?'
+AS_PATH_MEMBER_MATCH = [
+    # ASN or ASN in set, with regex operators
+    re.compile(r"^\^?{pre}{asn}{after}{regexops}\$?$".format(
+        pre=pre_member, after=after_member, asn=regex_asn,
+        regexops=regex_ops)),
+
+    # AS_SET or AS_SET in set, with regex operators
+    re.compile(r"^\^?{pre}{as_set}{after}{regexops}\$?$".format(
+        pre=pre_member, after=after_member, as_set=regex_as_set,
+        regexops=regex_ops)),
+
+    # AS1-AS2 in set with regex operators
+    re.compile(r"^\^?{pre}{asn}-{asn}{after}{regexops}\$?$".format(
+        pre=pre_member, asn=regex_asn, after=after_member,
+        regexops=regex_ops)),
+
+    # '.' with regex operators
+    re.compile(r"^\^?\.{regexops}\$?$".format(regexops=regex_ops)),
+]
 
 
 def is_ASN(value):
@@ -114,7 +139,8 @@ class RouteObjectDir(object):
     """A Class for storing Route objects in a dictionary."""
     # Thanks to Tomas.
 
-    # TODO extend with a RouteTree to store routes in a tree based structure and provide functions for fast lookup
+    # TODO: Extend with a RouteTree to store routes in a tree based structure
+    # and provide functions for fast lookup.
     def __init__(self, ipv6=True):
         self.origin_table = {}
         self.ipv6 = ipv6
@@ -223,7 +249,9 @@ class PeeringSetObject(RpslObject):
         return self.peering_set
 
     def __str__(self):
-        return 'PeeringSetObject: {} -< {} mp: {}'.format(self.peering_set, str(self.peering), str(self.mp_peering))
+        return 'PeeringSetObject: {} -< {} mp: {}'.format(self.peering_set,
+                                                          str(self.peering),
+                                                          str(self.mp_peering))
 
 
 class FilterSetObject(RpslObject):
@@ -329,7 +357,8 @@ class PeeringPoint:
         return str(self.local_ip) + "|" + str(self.remote_ip)
 
     def __str__(self):
-        return "Local_IP: {} Remote_IP: {}".format(self.local_ip, self.remote_ip)
+        return "Local_IP: {} Remote_IP: {}".format(self.local_ip,
+                                                   self.remote_ip)
 
 
 class PeerObjDir:

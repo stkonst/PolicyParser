@@ -11,8 +11,8 @@ ASPATH_END = ">"
 PREFIX_START = "{"
 PREFIX_END = "}"
 
-AS, AS_SET, AS_PATH, PREFIX_LIST, RS_SET = (
-    'AS AS_set  AS_path  prefix_list  rs_set'.split())
+AS, AS_SET, AS_PATH, PREFIX_LIST, RS_SET, ANY = (
+    'AS AS_set  AS_path  prefix_list  rs_set ANY'.split())
 
 op_details = namedtuple('op_details', 'precedence associativity')
 
@@ -76,8 +76,7 @@ def _explode_filter(filter_text):
         if char == PREFIX_START:
             range_end = filter_text.find(PREFIX_END, i)
             if range_end == -1:
-                raise errors.FilterAnalysisError("Non matching curly "
-                                                 "brackets!")
+                raise errors.FilterAnalysisError("Mismatched curly brackets!")
 
             # If the enclosing value is not a regex range operator explode the
             # left curly bracket.
@@ -243,8 +242,12 @@ def _get_tokens(filter_text, ASes, AS_sets, RS_sets):
                 RS_sets.add(token)
                 pushed_term = True
 
+            elif token == ANY:
+                identified_tokens.append((ANY, token))
+                pushed_term = True
+
             else:
-                raise errors.UnimplementedError("Not implemented element: "
+                raise errors.UnimplementedError("Unimplemented element: "
                                                 "'{}'!".format(token))
 
     if inside_ASPATH:
@@ -383,20 +386,48 @@ def compose_filter(output_queue):
 
 
 if __name__ == "__main__":
-    TEST_STRING_1 = "(AS1 OR AS2) AND <AS1+ AS2*>"
-    TEST_STRING_2 = "(AS1 OR AS2) AND <AS1+ AS2*> AND <AS99{3,}> AND (AS-3 OR AS-4) AND NOT {192.168.1.0/24, 10.0.0.0/1}dfasdf AND {192.168.1.0/24^-}^26-28"
-    TEST_STRING_3 = "(AS1 AS2) AND AS3 AS4 RS-12"
-    TEST_STRING_4 = "(AS1 AS2) AS3 AS4 AND <AS-PATHffnsakdlfa fasdf> {asdf fasdf}"
-    TEST_STRING_5 = "<^AS1 + ? ~ * ~+ ~? ~* {3,3} AS-set AS* .* .+ .? AS1+ AS1? AS1* AS1{3,3} AS1{3,} AS1{3} AS-set{3,} AS-set* AS-set$>"
-    TEST_STRING_6 = "(AS1 OR AS2)  AND (AS3 OR AS4)"
-    TEST_STRING = TEST_STRING_6
+    def debug():
+        """Provides some in depth information about the steps during the filter
+        analysis and the result.
 
-    out, ases, assets, rssets = analyze_filter(TEST_STRING)
-    print "out: {}".format([desc if desc in ops else value for desc, value in out])
-    # compose_filters(out)
-    # print "\n \n"
-    # print "out: {}".format([desc for desc, value in out])
-    # print "ases: {}".format(ases)
-    # print "assets: {}".format(assets)
-    # print "rssets: {}".format(rssets)
-    # compose_filters(out)
+        RPSL expressions can be tested using the following format.
+        """
+        import temp_operations_with_terms as temp
+
+        TEST_STRING_1 = "AS1 AND AS2 AND AS3"
+        TEST_STRING_2 = "AS1 OR AS2 OR AS3"
+
+        TEST_STRINGS = [TEST_STRING_1, TEST_STRING_2]
+
+        for i, TEST_STRING in enumerate(TEST_STRINGS):
+            try:
+                print "==== Filter: {} ====".format(i + 1)
+                print "Input"
+                print "-----"
+                print "{}".format(TEST_STRING)
+                print
+                out, _, _, _ = analyze_filter(TEST_STRING)
+                print "Analyzed"
+                print "--------"
+                print "{}".format(
+                    [desc if desc in ops else value for desc, value in out])
+                print
+                result = temp.compose_filter(out)
+                print "Result"
+                print "------"
+                print "{}".format(result)
+                print
+                print "Terms"
+                print "-----"
+                for term in result:
+                    print "Allow: {}".format(term.allow)
+                    print "Members: {}".format([m.data for m in term.members])
+                    print
+            except Exception as e:
+                print "Error: {}".format(e)
+            finally:
+                print "--------------------------------"
+                print
+                print
+
+    debug()
