@@ -303,9 +303,9 @@ def _subprocess_AS_set_resolving(AS_set_list):
 
     # When the queue is consumed put poison pills in order to signal the
     # threads to stop.
-    for i in xrange(len(threads)):
+    for _ in threads:
         q.put('KILL')
-    for i, t in enumerate(threads):
+    for t in threads:
         t.join()
     q.join()
 
@@ -374,7 +374,7 @@ def _subprocess_AS_resolving(ASN_batch, result_q):
 
     # When the queue is consumed put poison pills in order to signal the
     # threads to stop.
-    for i in xrange(len(threads)):
+    for _ in threads:
         q.put('KILL')
     for t in threads:
         t.join()
@@ -472,9 +472,9 @@ def _subprocess_RS_resolving(RS_list):
 
     # When the queue is consumed put poison pills in order to signal the
     # threads to stop.
-    for i in xrange(len(threads)):
+    for _ in threads:
         q.put('KILL')
-    for i, t in enumerate(threads):
+    for t in threads:
         t.join()
     q.join()
 

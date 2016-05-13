@@ -417,7 +417,7 @@ def parse_AS_routes(xml_resp, ipv4=True, ipv6=True):
                 in_primary_key = True
             elif event == 'end':
                 if elem.tag == 'attribute' and in_primary_key:
-                        continue
+                    continue
                 elif elem.tag == 'primary-key':
                     for child_elem in elem:
                         if ipv4 and child_elem.attrib.get('name') == 'route':

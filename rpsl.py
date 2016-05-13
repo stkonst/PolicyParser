@@ -243,16 +243,12 @@ class FilterSetObject(RpslObject):
         return self.filter_set
 
     def __str__(self):
-        f = None
+        f = []
         if self.filter:
-            f = str(self.filter)
+            f.append(str(self.filter))
         if self.mp_filter:
-            if f:
-                f += ' + '
-            else:
-                f = ''
-            f += str(self.mp_filter)
-        return 'FilterSetbject: {} -< {}'.format(self.filter_set, f)
+            f.append(str(self.mp_filter))
+        return 'FilterSetbject: {} -< {}'.format(self.filter_set, ' + '.join(f))
 
 
 class RouteSetObject(RpslObject):

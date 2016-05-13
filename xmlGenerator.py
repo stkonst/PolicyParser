@@ -183,7 +183,7 @@ class XmlGenerator:
         for f, v in peer_AS.filters.iteritems():
             if v == "import":
                 im.append(self._get_filter_template(f))
-            if v == "export":
+            elif v == "export":
                 ex.append(self._get_filter_template(f))
 
         im = et.SubElement(template_root, 'mp-imports')
@@ -192,17 +192,17 @@ class XmlGenerator:
         for f, v in peer_AS.mp_filters.iteritems():
             if v == "import":
                 im.append(self._get_filter_template(f))
-            if v == "export":
+            elif v == "export":
                 ex.append(self._get_filter_template(f))
 
         return template_root
 
     def convert_filters_to_XML(self, peer_filter_dir):
-        for p, val in peer_filter_dir.filter_table.iteritems():
+        for val in peer_filter_dir.filter_table.itervalues():
             self.xml_policy.find('peering-filters').append(self._filter_to_XML(val))
 
     def convert_peers_to_XML(self, peer_obj_dir):
-        for p, val in peer_obj_dir.peer_table.iteritems():
+        for val in peer_obj_dir.peer_table.itervalues():
             self.xml_policy.find('peering-policy').append(self.peer_to_XML(val))
 
     def convert_lists_to_XML(self, AS_list, AS_object_dir, RS_list,

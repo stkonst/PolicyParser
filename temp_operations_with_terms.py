@@ -82,9 +82,7 @@ def _OR(queue):
         """
         result = deque()
         for op_term in operation:
-            if op_term.allow:
-                result.append(op_term)
-            elif check_nested_NOT and not op_term.allow:
+            if check_nested_NOT and not op_term.allow:
                 raise errors.UnimplementedError("No support for nested "
                                                 "operation which includes "
                                                 "NOT!")
@@ -262,7 +260,7 @@ def _AND(queue):
             for op_term in operation:
                 if op_term.allow:
                     op_term.members.append(simple_operand)
-                elif check_nested_NOT and not op_term.allow:
+                elif check_nested_NOT:
                     raise errors.UnimplementedError("No support for nested "
                                                     "operation which includes "
                                                     "NOT!")

@@ -17,7 +17,7 @@ def read_blisted(AS_list):
     items = set(AS_list.split(","))
     for i in items:
         if not rpsl.is_ASN(i):
-            print "{} is not a valid AS number!".format(i)
+            print("{} is not a valid AS number!".format(i))
             exit(1)
     return items
 
@@ -36,6 +36,7 @@ def build_XML_policy(autnum, ipv6=True, output='screen'):
                   "{}".format(pp.filter_expressions.number_of_filters()))
     if pp.filter_expressions.number_of_filters() < 1:
         print("No filter expressions found.")
+        com.session.close()
         return None
     com.session.close()
 
@@ -55,20 +56,19 @@ def build_XML_policy(autnum, ipv6=True, output='screen'):
                                 fr.AS_set_list, fr.AS_set_dir)
 
     if output == "browser":
-        return xmlgen.__str__()
+        return str(xmlgen)
     elif output == "screen":
-        reparsed = parseString(xmlgen.__str__())
+        reparsed = parseString(str(xmlgen))
         return reparsed.toprettyxml(indent="\t")
     elif output == "file":
-        return xmlgen.__str__()
+        return str(xmlgen)
 
 
 # ~~~ Script starts here ~~~
 if __name__ == "__main__":
-    starting_flag = True
     if len(sys.argv) < 2:
-        print "\nIncomplete number of parameters. \n{}\n".format(help_message)
-        starting_flag = False
+        print("\nIncomplete number of parameters. \n{}\n".format(help_message))
+        sys.exit(1)
 
     else:
         for arg in sys.argv:
@@ -76,9 +76,8 @@ if __name__ == "__main__":
                 if rpsl.is_ASN(sys.argv[sys.argv.index('-a') + 1]):
                     params["as_number"] = sys.argv[sys.argv.index('-a') + 1].upper()
                 else:
-                    print "Invalid aut-number"
-                    starting_flag = False
-                    exit(1)
+                    print("Invalid aut-number")
+                    sys.exit(1)
             if arg == "-o":
                 params["output_file"] = sys.argv[sys.argv.index('-o') + 1]
 
@@ -92,19 +91,17 @@ if __name__ == "__main__":
 
     print("Configuration done. Starting...")
 
-    if starting_flag:
-        logging.getLogger("requests").setLevel(logging.WARNING)
-        if "output_file" in params:
-            logging.basicConfig(filename=params["output_file"] + '.log',
-                                level=logging.DEBUG)
-            xml_result = build_XML_policy(params.get("as_number"),
-                                          output='file')
-            if xml_result:
-                f = open(params["output_file"], mode='w')
-                f.write(xml_result)
-                f.close()
-        else:
-            logging.basicConfig(level=logging.DEBUG)
-            print build_XML_policy(params.get("as_number"), output='screen')
+    logging.getLogger("requests").setLevel(logging.WARNING)
+    if "output_file" in params:
+        logging.basicConfig(filename=params["output_file"] + '.log',
+                            level=logging.DEBUG)
+        xml_result = build_XML_policy(params.get("as_number"), output='file')
+        if xml_result:
+            f = open(params["output_file"], mode='w')
+            f.write(xml_result)
+            f.close()
+    else:
+        logging.basicConfig(level=logging.DEBUG)
+        print(build_XML_policy(params.get("as_number"), output='screen'))
 
-        logging.info("All done. XML policy is ready.")
+    logging.info("All done. XML policy is ready.")
