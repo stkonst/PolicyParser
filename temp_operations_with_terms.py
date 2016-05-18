@@ -364,7 +364,10 @@ def _AND(queue):
                     if term.allow:
                         new_term = Term(term.allow)
                         new_term.members = [m for m in term.members if m != term_member]
-                        result = [t if t != term else new_term for t in result]
+                        if new_term.members:
+                            result = [t if t != term else new_term for t in result]
+                        else:
+                            result = [t for t in result if t != term]
                     else:
                         new_term = Term(term.allow)
                         new_term.members = [term_member]
