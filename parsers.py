@@ -344,21 +344,15 @@ class PolicyParser:
         # (hash value) while the real filter will be stored temporarily for the
         # second round of resolving.
 
-        if res[2][0][1] != 'ANY':
-            # Create a hash of the filter expression
-            ha = str(xxhash.xxh64(res[2][0][1]).hexdigest())
+        ha = str(xxhash.xxh64(res[2][0][1]).hexdigest())
+        pf = rpsl.PeerFilter(ha, res[1], res[2][0][1])
+        self.filter_expressions.append_filter(pf)
 
-            # The actual peer filter is constructed and stored here.
-            pf = rpsl.PeerFilter(ha, res[1], res[2][0][1])
-            self.filter_expressions.append_filter(pf)
-
-            # Append in the peer the filter set(direction, afi, hash)
-            try:
-                peer_as.append_filter((res[0], res[1], ha), mp)  # !!!!!!!!!!!!! TODO: Try to find what the '!'s mean.
-            except errors.AppendFilterError:
-                # logging.warning("Failed to append filter %s on peer %s" % (ha, peer_as.origin))
-                raise errors.InterpreterError("Failed to append filter for "
-                                              "peer {}.".format(peer_as.origin))
+        try:
+            peer_as.append_filter((res[0], res[1], ha), mp)  # !!!!!!!!!!!!! TODO: Try to find what the '!'s mean.
+        except errors.AppendFilterError:
+            # logging.warning("Failed to append filter %s on peer %s" % (ha, peer_as.origin))
+            raise errors.InterpreterError("Failed to append filter for peer {}.".format(peer_as.origin))
 
         pp = rpsl.PeeringPoint()
 
