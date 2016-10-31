@@ -6,6 +6,7 @@ import yaml
 
 class YamlGenerator:
     def __init__(self):
+        self.name_prefix = "manta_"
         self.yaml_policy = {'datetime': str(datetime.datetime.now())}
 
     def print_policy(self):
@@ -30,7 +31,7 @@ class YamlGenerator:
 
         self._get_all_AS_routes(AS_object, routes4, routes6)
 
-        return {AS_object.origin: {'ipv4': routes4, 'ipv6': routes6}}
+        return {self.name_prefix + AS_object.origin: {'ipv4': routes4, 'ipv6': routes6}}
 
     def _convert_ASset_to_dict(self, AS_set_object, AS_object_dir, AS_set_object_dir):
         """Traverses the tree created by the AS sets. Ignores duplicate ASes
@@ -94,6 +95,11 @@ class YamlGenerator:
 
     def _filter_to_dict(self, peer_filter):
 
+        """
+        Converts a peer filter that is applied in a peer of the peering policy into YAML format. The peer filter is
+        type of accept or deny and includes the statements (AS-paths or prefix-lists) that need be accepted or denied.
+        """
+
         statements = {}
         for i, t in enumerate(peer_filter.statements):
 
@@ -107,9 +113,9 @@ class YamlGenerator:
                 if item.category == "AS_PATH":
                     statement['AS_PATH'] = item.data[1]
                 elif item.category in ("AS", "AS_set", "rs_set"):
-                    statement['prefix-list'] = str(item.data)
+                    statement['prefix-list'] = self.name_prefix + str(item.data)
                 elif item.category == "prefix_list":
-                    statement['prefix-list'] = [p for p in item.data]
+                    statement['prefix-list'] = [self.name_prefix + p for p in item.data]
 
             statements[str(i)] = statement
         return {peer_filter.hash_value: {'afi': peer_filter.afi, 'expression': peer_filter.expression,
@@ -117,16 +123,11 @@ class YamlGenerator:
 
     def _peer_to_dict(self, peer_AS):
 
-        # ppoints= []
-        # for pp in peer_AS.peering_points.itervalues():
+        """
+        Converts a peer object that is found in the peering policy into YAML format. Currently only imports/exports
+        are converted. TODO: extend the function to insert actions also.
+        """
 
-        # actions_in = {}
-        # actions_out = {}
-        # ppoints.append({"local-IP": pp.local_ip, "remote-IP": pp.remote_ip,
-        #                 "actions_in": actions_in, "actions_out": actions_out})
-
-        # return {peer_AS.origin: {"peering-points": ppoints, "filters": {"imports": [], "exports": [],
-        #                                                                 "mp-imports": [], "mp-exports": []}}}
         imports = []
         exports = []
 
@@ -156,7 +157,7 @@ class YamlGenerator:
         for s in AS_set_list:
             try:
                 obj = AS_set_object_dir.data[s]
-                dic_objects[s] = self._convert_ASset_to_dict(obj, AS_object_dir, AS_set_object_dir)
+                dic_objects[self.name_prefix + s] = self._convert_ASset_to_dict(obj, AS_object_dir, AS_set_object_dir)
             except KeyError:
                 pass
 
@@ -171,7 +172,7 @@ class YamlGenerator:
         for r in RS_list:
             try:
                 obj = route_set_object_dir.data[r]
-                dic_objects[r] = self._convert_RS_to_dict(obj, route_set_object_dir)
+                dic_objects[self.name_prefix + r] = self._convert_RS_to_dict(obj, route_set_object_dir)
             except KeyError:
                 pass
 

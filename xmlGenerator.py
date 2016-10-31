@@ -6,6 +6,7 @@ from collections import deque
 class XmlGenerator:
     def __init__(self, autnum):
         self.autnum = autnum
+        self.name_prefix = "manta_"
         self.xml_policy = self.get_policy_template(self.autnum)  # Init XML Template
 
     def _get_action_template(self, policy_action_list):
@@ -86,10 +87,10 @@ class XmlGenerator:
                 if item.category == "AS_PATH":
                     et.SubElement(st, 'as-path').text = str(item.data[1])
                 elif item.category in ("AS", "AS_set", "rs_set"):
-                    et.SubElement(st, 'prefix-list').text = str(item.data)
+                    et.SubElement(st, 'prefix-list').text = self.name_prefix + str(item.data)
                 elif item.category == "prefix_list":
                     for p in item.data:
-                        et.SubElement(st, 'prefix-list').text = p
+                        et.SubElement(st, 'prefix-list').text = self.name_prefix + p
 
         return fltr_root
 
@@ -211,7 +212,7 @@ class XmlGenerator:
         p = self.xml_policy.find('prefix-lists')
 
         for s in AS_set_list:
-            pl = et.SubElement(p, 'prefix-list', attrib={'name': s})
+            pl = et.SubElement(p, 'prefix-list', attrib={'name': self.name_prefix + s})
 
             try:
                 obj = AS_set_object_dir.data[s]
@@ -220,7 +221,7 @@ class XmlGenerator:
                 pass
 
         for v in AS_list:
-            pl = et.SubElement(p, 'prefix-list', attrib={'name': v})
+            pl = et.SubElement(p, 'prefix-list', attrib={'name': self.name_prefix + v})
 
             try:
                 obj = AS_object_dir.data[v]
@@ -229,7 +230,7 @@ class XmlGenerator:
                 pass
 
         for r in RS_list:
-            pl = et.SubElement(p, 'prefix-list', attrib={'name': r})
+            pl = et.SubElement(p, 'prefix-list', attrib={'name': self.name_prefix + r})
 
             try:
                 obj = route_set_object_dir.data[r]
