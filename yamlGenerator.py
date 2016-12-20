@@ -58,7 +58,7 @@ class YamlGenerator:
             for child_set in current_set.AS_set_members:
                 if child_set not in traversed_AS_sets:
                     traversed_AS_sets.add(child_set)
-                    AS_set_tree.extend(child_set)
+                    AS_set_tree.append(child_set)
 
         return {'ipv4': routes4, 'ipv6': routes6}
 
@@ -89,7 +89,7 @@ class YamlGenerator:
             for child_set in current_set.RSes_dir:
                 if child_set not in traversed_route_sets:
                     traversed_route_sets.add(child_set)
-                    route_set_tree.extend(child_set)
+                    route_set_tree.append(child_set)
 
         return {'ipv4': routes4, 'ipv6': routes6}
 
@@ -157,8 +157,10 @@ class YamlGenerator:
         for s in AS_set_list:
             try:
                 obj = AS_set_object_dir.data[s]
-                dic_objects[self.name_prefix + s] = self._convert_ASset_to_dict(obj, AS_object_dir, AS_set_object_dir)
-            except KeyError:
+                thing = self._convert_ASset_to_dict(obj, AS_object_dir, AS_set_object_dir)
+                dic_objects[self.name_prefix + s] = thing
+            except KeyError as e:
+                print "{}:{}".format(e.__class__.__name__, e)
                 pass
 
         for v in AS_list:

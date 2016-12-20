@@ -56,8 +56,9 @@ class XmlGenerator:
         """Builds the basic high level structure of the XML document."""
         template_root = et.Element('root')
 
-        template_root.append(et.Comment('This is a resolved XML policy file '
-                                        'for {}'.format(autnum)))
+        if autnum != "":
+            template_root.append(et.Comment('This is a resolved XML policy file '
+                                            'for {}'.format(autnum)))
         et.SubElement(template_root, 'datetime').text = str(datetime.datetime.now())
 
         et.SubElement(template_root, 'prefix-lists')
@@ -128,7 +129,8 @@ class XmlGenerator:
             for child_set in current_set.RSes_dir:
                 if child_set not in traversed_route_sets:
                     traversed_route_sets.add(child_set)
-                    route_set_tree.extend(child_set)
+                    # route_set_tree.extend(child_set)
+                    route_set_tree.append(child_set)
 
     def _AS_set_to_XML(self, AS_set_object, AS_object_dir, AS_set_object_dir,
                        pl_root):
@@ -153,7 +155,8 @@ class XmlGenerator:
             for child_set in current_set.AS_set_members:
                 if child_set not in traversed_AS_sets:
                     traversed_AS_sets.add(child_set)
-                    AS_set_tree.extend(child_set)
+                    # AS_set_tree.extend(child_set)
+                    AS_set_tree.append(child_set)
 
     def _peering_point_to_XML(self, points_root, peering_point):
         if peering_point.get_key() is not "|":
