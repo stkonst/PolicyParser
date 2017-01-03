@@ -9,26 +9,28 @@ import xmlGenerator
 import yamlGenerator
 
 
-def selector(rpsl_string, routes_only, ipv6=True, output_type='screen', black_list=set(), output_format="XML"):
+def selector(rpsl_string, routes_only, aggregate, ipv6=True, output_type='screen', black_list=set(),
+             output_format="XML"):
     if not rpsl.is_ASN(rpsl_string):
 
-        return build_simple_filter_output(rpsl_string, black_list, ipv6, output_type, output_format)
+        return build_simple_filter_output(rpsl_string, aggregate, black_list, ipv6, output_type, output_format)
 
     else:
         # Looks like we have an AS number for input
 
         if routes_only:
 
-            return build_simple_filter_output(rpsl_string, black_list, ipv6, output_type, output_format)
+            return build_simple_filter_output(rpsl_string, aggregate, black_list, ipv6, output_type, output_format)
 
         else:
             #   Full policy resolving, go ahead then
 
-            return build_full_policy_output(rpsl_string, ipv6=ipv6, output=output_type, black_list=black_list,
+            return build_full_policy_output(rpsl_string, aggregate, ipv6=ipv6, output=output_type,
+                                            black_list=black_list,
                                             policy_format=output_format)
 
 
-def build_simple_filter_output(rpsl_string, black_list, ipv6, output_type, output_format):
+def build_simple_filter_output(rpsl_string, aggregate, black_list, ipv6, output_type, output_format):
     pd = rpsl.PeerFilterDir()
     pd.append_filter(rpsl.PeerFilter("", "", rpsl_string))
 
@@ -37,13 +39,13 @@ def build_simple_filter_output(rpsl_string, black_list, ipv6, output_type, outpu
 
     if output_format == "YAML":
 
-        return _to_YAML(None, fr)
+        return _to_YAML(None, aggregate, fr)
     else:
 
-        return _to_XML("", None, fr, output_type)
+        return _to_XML("", None, aggregate, fr, output_type)
 
 
-def build_full_policy_output(autnum, ipv6=True, output='screen', black_list=set(), policy_format="XML"):
+def build_full_policy_output(autnum, aggregate, ipv6=True, output='screen', black_list=set(), policy_format="XML"):
     #
     # PreProcess section: Get own policy, parse and create necessary Data
     #                     Structures.
@@ -71,31 +73,31 @@ def build_full_policy_output(autnum, ipv6=True, output='screen', black_list=set(
     # PostProcess section: Create and deliver the corresponding output.
     #
     if policy_format == "YAML":
-        return _to_YAML(pp, fr)
+        return _to_YAML(pp, aggregate, fr)
 
     else:
-        return _to_XML(autnum, pp, fr, output)
+        return _to_XML(autnum, pp, aggregate, fr, output)
 
 
-def _to_YAML(pp, fr):
+def _to_YAML(pp, aggregate, fr):
     yo = yamlGenerator.YamlGenerator()
     if fr:
         yo.convert_lists_to_dict(fr.AS_list, fr.AS_dir, fr.RS_list, fr.RS_dir,
-                                 fr.AS_set_list, fr.AS_set_dir)
+                                 fr.AS_set_list, fr.AS_set_dir, aggregate)
     if pp:
         yo.convert_filters_to_dict(pp.filter_expressions)
         yo.convert_peers_to_yaml(pp.peerings)
     return yo.print_policy()
 
 
-def _to_XML(autnum, pp, fr, output):
+def _to_XML(autnum, pp, aggregate, fr, output):
     xmlgen = xmlGenerator.XmlGenerator(autnum)
     if pp:
         xmlgen.convert_peers_to_XML(pp.peerings)
         xmlgen.convert_filters_to_XML(pp.filter_expressions)
     if fr:
         xmlgen.convert_lists_to_XML(fr.AS_list, fr.AS_dir, fr.RS_list, fr.RS_dir,
-                                    fr.AS_set_list, fr.AS_set_dir)
+                                    fr.AS_set_list, fr.AS_set_dir, aggregate)
 
     if output == "browser":
         return str(xmlgen)
@@ -161,6 +163,8 @@ if __name__ == "__main__":
                         help="Select the format of the output file. It can be either XML (default) or YAML.")
     parser.add_argument('-r', '--routes_only', action="store_true",
                         help="Returns the route objects only that are related to the given AS number.")
+    parser.add_argument('-a', '--aggregate', action="store_true",
+                        help="Aggregates the routes of a prefix list.")
 
     args = parser.parse_args()
     if args.debug:
@@ -181,14 +185,16 @@ if __name__ == "__main__":
         logging.basicConfig(filename=args.outputfile + '.log', filemode="w",
                             level=logging_level)
 
-        lib_result = selector(args.OBJECT, args.routes_only, output_type='file', black_list=args.blacklist,
+        lib_result = selector(args.OBJECT, args.routes_only, args.aggregate, output_type='file',
+                              black_list=args.blacklist,
                               output_format=args.format)
         if lib_result:
             with open(args.outputfile, mode='w') as f:
                 f.write(lib_result)
     else:
         logging.basicConfig(level=logging_level)
-        lib_result = selector(args.OBJECT, args.routes_only, output_type='screen', black_list=args.blacklist,
+        lib_result = selector(args.OBJECT, args.routes_only, args.aggregate, output_type='screen',
+                              black_list=args.blacklist,
                               output_format=args.format)
         if lib_result:
             print "\n\n" + lib_result

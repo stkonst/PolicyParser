@@ -19,6 +19,7 @@ Python(2) dependencies:
 - PyYaml
 - xxhash
 - gevent (Not required but will provide speedup and less memory consumption)
+- IPy
 
 Install with:
 `pip install -r requirements.txt`
@@ -34,7 +35,7 @@ parameters.
 ### Init flags and parameters
 General usage:
 
-`libParser.py [-h] [-o OUTPUTFILE] [-b BLACKLIST] [-f FORMAT] [-d] ASN`
+`libParser.py [-h] [-o OUTPUTFILE] [-b BLACKLIST] [-f FORMAT] [-d] [-r] [-a] ASN`
 
 - `ASN`
 Autonomous System name in AS<number> format.
@@ -47,11 +48,18 @@ highly recommended to pass this parameter for cleaner reporting.
 - `-b`
 A comma separated list of AS numbers that can be excluded from the resolving.
 
+- `-r`
+For the given AS number, return only is corresponding routes. It skips the 
+filter resolving and and the policy sections. 
+
 - `-f`
 The format of the output file YAML|XML. If omitted, the default XML format will be used. 
 
 - `-d`
 Log additional debugging information.
 
+- `-a`
+Aggregate the routes of the prefix lists.
+
 ### Usage example:
-`python libParser.py -b AS1234,AS5678 -o as3333 AS3333`
+`python libParser.py -b AS1234,AS5678 -o as3333 -f XML AS3333`

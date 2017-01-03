@@ -2,6 +2,8 @@ import xml.etree.ElementTree as et
 import datetime
 from collections import deque
 
+import aggregator
+
 
 class XmlGenerator:
     def __init__(self, autnum):
@@ -95,17 +97,31 @@ class XmlGenerator:
 
         return fltr_root
 
-    def _AS_to_XML(self, AS_object, pl):
+    def _AS_to_XML(self, AS_object, pl, aggregate):
         """Converts a given AS number into a prefix list with ipv4/ipv6
         prefixes.
         """
+
+        route_list4 = []
+        route_list6 = []
+
         for r in AS_object.route_obj_dir.origin_table.itervalues():
-            et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+            route_list4.append(r)
 
         for r in AS_object.route_obj_dir.origin_table_v6.itervalues():
+            route_list6.append(r)
+
+        if aggregate:
+            route_list4 = aggregator.aggregate_prefix_list(route_list4)
+            route_list6 = aggregator.aggregate_prefix_list(route_list6)
+
+        for r in route_list4:
             et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
 
-    def _route_set_to_XML(self, route_set_object, route_set_object_dir, pl):
+        for r in route_list6:
+            et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+
+    def _route_set_to_XML(self, route_set_object, route_set_object_dir, pl, aggregate):
         """Traverses the tree created by the RSes. Ignores duplicate routes
         and avoids loops.
         """
@@ -113,27 +129,41 @@ class XmlGenerator:
         traversed_route_sets = set()
         traversed_routes = set()
 
+        route_list4 = []
+        route_list6 = []
+
         while route_set_tree:
             current_set_name = route_set_tree.popleft()
             current_set = route_set_object_dir.data[current_set_name]
             for r in current_set.members.origin_table.itervalues():
                 if r.route not in traversed_routes:
-                    et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+                    # et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+                    route_list4.append(r.route)
                     traversed_routes.add(r.route)
 
             for r in current_set.mp_members.origin_table_v6.itervalues():
                 if r.route not in traversed_routes:
-                    et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+                    # et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+                    route_list6.append(r.route)
                     traversed_routes.add(r.route)
 
             for child_set in current_set.RSes_dir:
                 if child_set not in traversed_route_sets:
                     traversed_route_sets.add(child_set)
-                    # route_set_tree.extend(child_set)
                     route_set_tree.append(child_set)
 
+        if aggregate:
+            route_list4 = aggregator.aggregate_prefix_list(route_list4)
+            route_list6 = aggregator.aggregate_prefix_list(route_list6)
+
+        for r in route_list4:
+            et.SubElement(pl, 'prefix', attrib={'type': ""}).text = r.route
+
+        for r in route_list6:
+            et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+
     def _AS_set_to_XML(self, AS_set_object, AS_object_dir, AS_set_object_dir,
-                       pl_root):
+                       pl_root, aggregate):
         """Traverses the tree created by the AS sets. Ignores duplicate ASes
         and avoids loops.
         """
@@ -148,14 +178,13 @@ class XmlGenerator:
                 if child_AS not in traversed_ASes:
                     traversed_ASes.add(child_AS)
                     try:
-                        self._AS_to_XML(AS_object_dir.data[child_AS], pl_root)
+                        self._AS_to_XML(AS_object_dir.data[child_AS], pl_root, aggregate)
                     except KeyError:
                         pass
 
             for child_set in current_set.AS_set_members:
                 if child_set not in traversed_AS_sets:
                     traversed_AS_sets.add(child_set)
-                    # AS_set_tree.extend(child_set)
                     AS_set_tree.append(child_set)
 
     def _peering_point_to_XML(self, points_root, peering_point):
@@ -211,7 +240,7 @@ class XmlGenerator:
 
     def convert_lists_to_XML(self, AS_list, AS_object_dir, RS_list,
                              route_set_object_dir, AS_set_list,
-                             AS_set_object_dir):
+                             AS_set_object_dir, aggregate):
         p = self.xml_policy.find('prefix-lists')
 
         for s in AS_set_list:
@@ -219,7 +248,7 @@ class XmlGenerator:
 
             try:
                 obj = AS_set_object_dir.data[s]
-                self._AS_set_to_XML(obj, AS_object_dir, AS_set_object_dir, pl)
+                self._AS_set_to_XML(obj, AS_object_dir, AS_set_object_dir, pl, aggregate)
             except KeyError:
                 pass
 
@@ -228,7 +257,7 @@ class XmlGenerator:
 
             try:
                 obj = AS_object_dir.data[v]
-                self._AS_to_XML(obj, pl)
+                self._AS_to_XML(obj, pl, aggregate)
             except KeyError:
                 pass
 
@@ -237,7 +266,7 @@ class XmlGenerator:
 
             try:
                 obj = route_set_object_dir.data[r]
-                self._route_set_to_XML(obj, route_set_object_dir, pl)
+                self._route_set_to_XML(obj, route_set_object_dir, pl, aggregate)
             except KeyError:
                 pass
 

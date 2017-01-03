@@ -48,3 +48,7 @@ class ASNParserError(Error):
 
 class ActionParseError(Error):
     pass
+
+
+class IPparseError(Error):
+    pass
