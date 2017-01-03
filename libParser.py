@@ -9,7 +9,43 @@ import xmlGenerator
 import yamlGenerator
 
 
-def build_policy(autnum, ipv6=True, output='screen', black_list=set(), policy_format="XML"):
+def selector(rpsl_string, routes_only, aggregate, ipv6=True, output_type='screen', black_list=set(),
+             output_format="XML"):
+    if not rpsl.is_ASN(rpsl_string):
+
+        return build_simple_filter_output(rpsl_string, aggregate, black_list, ipv6, output_type, output_format)
+
+    else:
+        # Looks like we have an AS number for input
+
+        if routes_only:
+
+            return build_simple_filter_output(rpsl_string, aggregate, black_list, ipv6, output_type, output_format)
+
+        else:
+            #   Full policy resolving, go ahead then
+
+            return build_full_policy_output(rpsl_string, aggregate, ipv6=ipv6, output=output_type,
+                                            black_list=black_list,
+                                            policy_format=output_format)
+
+
+def build_simple_filter_output(rpsl_string, aggregate, black_list, ipv6, output_type, output_format):
+    pd = rpsl.PeerFilterDir()
+    pd.append_filter(rpsl.PeerFilter("", "", rpsl_string))
+
+    fr = resolvers.FilterResolver(pd, ipv6, black_list)
+    fr.resolve_filters()
+
+    if output_format == "YAML":
+
+        return _to_YAML(None, aggregate, fr)
+    else:
+
+        return _to_XML("", None, aggregate, fr, output_type)
+
+
+def build_full_policy_output(autnum, aggregate, ipv6=True, output='screen', black_list=set(), policy_format="XML"):
     #
     # PreProcess section: Get own policy, parse and create necessary Data
     #                     Structures.
@@ -37,38 +73,54 @@ def build_policy(autnum, ipv6=True, output='screen', black_list=set(), policy_fo
     # PostProcess section: Create and deliver the corresponding output.
     #
     if policy_format == "YAML":
-        yo = yamlGenerator.YamlGenerator()
-        yo.convert_lists_to_dict(fr.AS_list, fr.AS_dir, fr.RS_list, fr.RS_dir,
-                                 fr.AS_set_list, fr.AS_set_dir)
-        yo.convert_filters_to_dict(pp.filter_expressions)
-        yo.convert_peers_to_yaml(pp.peerings)
-        return yo.print_policy()
+        return _to_YAML(pp, aggregate, fr)
 
     else:
-        xmlgen = xmlGenerator.XmlGenerator(autnum)
+        return _to_XML(autnum, pp, aggregate, fr, output)
+
+
+def _to_YAML(pp, aggregate, fr):
+    yo = yamlGenerator.YamlGenerator()
+    if fr:
+        yo.convert_lists_to_dict(fr.AS_list, fr.AS_dir, fr.RS_list, fr.RS_dir,
+                                 fr.AS_set_list, fr.AS_set_dir, aggregate)
+    if pp:
+        yo.convert_filters_to_dict(pp.filter_expressions)
+        yo.convert_peers_to_yaml(pp.peerings)
+    return yo.print_policy()
+
+
+def _to_XML(autnum, pp, aggregate, fr, output):
+    xmlgen = xmlGenerator.XmlGenerator(autnum)
+    if pp:
         xmlgen.convert_peers_to_XML(pp.peerings)
         xmlgen.convert_filters_to_XML(pp.filter_expressions)
+    if fr:
         xmlgen.convert_lists_to_XML(fr.AS_list, fr.AS_dir, fr.RS_list, fr.RS_dir,
-                                    fr.AS_set_list, fr.AS_set_dir)
+                                    fr.AS_set_list, fr.AS_set_dir, aggregate)
 
-        if output == "browser":
-            return str(xmlgen)
-        elif output == "screen":
-            reparsed = parseString(str(xmlgen))
-            return reparsed.toprettyxml(indent="\t")
-        elif output == "file":
-            return str(xmlgen)
+    if output == "browser":
+        return str(xmlgen)
+    elif output == "screen":
+        reparsed = parseString(str(xmlgen))
+        return reparsed.toprettyxml(indent="\t")
+    elif output == "file":
+        return str(xmlgen)
 
 
 if __name__ == "__main__":
     import argparse
 
 
-    def read_ASN(string):
-        if not rpsl.is_ASN(string):
-            raise argparse.ArgumentTypeError("Invalid ASN '{}'. Expected "
-                                             "format: AS<number>"
+    def read_OBJECT(string):
+
+        if rpsl.is_rs_set(string) or rpsl.is_pfx_filter(string) or rpsl.is_fltr_set(string):
+            raise argparse.ArgumentTypeError("Unsupported type of Object. Expected ASN or AS-SET")
+
+        if not (rpsl.is_ASN(string) or rpsl.is_AS_set(string)):
+            raise argparse.ArgumentTypeError("Invalid Object '{}'. Expected AS<number> or AS-<value>"
                                              .format(string))
+
         return string
 
 
@@ -94,8 +146,10 @@ if __name__ == "__main__":
 
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('ASN', type=read_ASN,
-                        help="Autonomous System name in AS<number> format.")
+
+    parser.add_argument('OBJECT', type=read_OBJECT,
+                        help="It is either an autonomous System name in AS<number> format "
+                             "or an AS-SET in AS-<value> format.")
     parser.add_argument('-o', '--outputfile', type=read_file,
                         help="Name of the output file produced. An additional "
                              ".log file will also be created.")
@@ -107,6 +161,10 @@ if __name__ == "__main__":
                         help="Log additional debugging information.")
     parser.add_argument('-f', '--format', type=read_format,
                         help="Select the format of the output file. It can be either XML (default) or YAML.")
+    parser.add_argument('-r', '--routes_only', action="store_true",
+                        help="Returns the route objects only that are related to the given AS number.")
+    parser.add_argument('-a', '--aggregate', action="store_true",
+                        help="Aggregates the routes of a prefix list.")
 
     args = parser.parse_args()
     if args.debug:
@@ -126,23 +184,26 @@ if __name__ == "__main__":
 
         logging.basicConfig(filename=args.outputfile + '.log', filemode="w",
                             level=logging_level)
-        policy_result = build_policy(args.ASN, output='file',
-                                     black_list=args.blacklist, policy_format=args.format)
-        if policy_result:
+
+        lib_result = selector(args.OBJECT, args.routes_only, args.aggregate, output_type='file',
+                              black_list=args.blacklist,
+                              output_format=args.format)
+        if lib_result:
             with open(args.outputfile, mode='w') as f:
-                f.write(policy_result)
+                f.write(lib_result)
     else:
         logging.basicConfig(level=logging_level)
-        policy_result = build_policy(args.ASN, output='screen',
-                                     black_list=args.blacklist, policy_format=args.format)
-        if policy_result:
-            print(policy_result)
+        lib_result = selector(args.OBJECT, args.routes_only, args.aggregate, output_type='screen',
+                              black_list=args.blacklist,
+                              output_format=args.format)
+        if lib_result:
+            print "\n\n" + lib_result
 
-    if policy_result:
-        logging.info("All done. Converted policy is ready.")
-        print("All done. Converted policy is ready.")
+    if lib_result:
+        logging.info("All done. Output is ready.")
+        print("All done. Output is ready.")
     else:
-        logging.info("Converted policy was not created. Check the logs for more "
+        logging.info("Failed to create the requested output. Check the logs for more "
                      "information.")
-        print("Converted policy was not created. Check the logs for more "
+        print("Failed to create the requested output. Check the logs for more "
               "information.")

@@ -3,6 +3,8 @@ from collections import deque
 
 import yaml
 
+import aggregator
+
 
 class YamlGenerator:
     def __init__(self):
@@ -22,7 +24,7 @@ class YamlGenerator:
         for r in AS_object.route_obj_dir.origin_table_v6.itervalues():
             routes6.append(r.route)
 
-    def _convert_AS_to_dict(self, AS_object):
+    def _convert_AS_to_dict(self, AS_object, aggregate):
         """Converts a given AS number into a dictionary which includes all IPv4 and IPv6 addresses
        """
 
@@ -31,9 +33,13 @@ class YamlGenerator:
 
         self._get_all_AS_routes(AS_object, routes4, routes6)
 
+        if aggregate:
+            routes4 = aggregator.aggregate_prefix_list(routes4)
+            routes6 = aggregator.aggregate_prefix_list(routes6)
+
         return {self.name_prefix + AS_object.origin: {'ipv4': routes4, 'ipv6': routes6}}
 
-    def _convert_ASset_to_dict(self, AS_set_object, AS_object_dir, AS_set_object_dir):
+    def _convert_ASset_to_dict(self, AS_set_object, AS_object_dir, AS_set_object_dir, aggregate):
         """Traverses the tree created by the AS sets. Ignores duplicate ASes
         and avoids loops.
         """
@@ -58,11 +64,15 @@ class YamlGenerator:
             for child_set in current_set.AS_set_members:
                 if child_set not in traversed_AS_sets:
                     traversed_AS_sets.add(child_set)
-                    AS_set_tree.extend(child_set)
+                    AS_set_tree.append(child_set)
+
+        if aggregate:
+            routes4 = aggregator.aggregate_prefix_list(routes4)
+            routes6 = aggregator.aggregate_prefix_list(routes6)
 
         return {'ipv4': routes4, 'ipv6': routes6}
 
-    def _convert_RS_to_dict(self, route_set_object, route_set_object_dir):
+    def _convert_RS_to_dict(self, route_set_object, route_set_object_dir, aggregate):
         """Traverses the tree created by the RSes. Ignores duplicate routes
         and avoids loops.
         """
@@ -89,7 +99,11 @@ class YamlGenerator:
             for child_set in current_set.RSes_dir:
                 if child_set not in traversed_route_sets:
                     traversed_route_sets.add(child_set)
-                    route_set_tree.extend(child_set)
+                    route_set_tree.append(child_set)
+
+        if aggregate:
+            routes4 = aggregator.aggregate_prefix_list(routes4)
+            routes6 = aggregator.aggregate_prefix_list(routes6)
 
         return {'ipv4': routes4, 'ipv6': routes6}
 
@@ -152,19 +166,21 @@ class YamlGenerator:
                                              "mp-exports": mp_exports}}}
 
     def convert_lists_to_dict(self, AS_list, AS_object_dir, RS_list, route_set_object_dir, AS_set_list,
-                              AS_set_object_dir):
+                              AS_set_object_dir, aggregate):
         dic_objects = dict()
         for s in AS_set_list:
             try:
                 obj = AS_set_object_dir.data[s]
-                dic_objects[self.name_prefix + s] = self._convert_ASset_to_dict(obj, AS_object_dir, AS_set_object_dir)
-            except KeyError:
+                dic_objects[self.name_prefix + s] = self._convert_ASset_to_dict(obj, AS_object_dir, AS_set_object_dir,
+                                                                                aggregate)
+            except KeyError as e:
+                print "{}:{}".format(e.__class__.__name__, e)
                 pass
 
         for v in AS_list:
             try:
                 obj = AS_object_dir.data[v]
-                dic_objects.update(self._convert_AS_to_dict(obj))
+                dic_objects.update(self._convert_AS_to_dict(obj, aggregate))
 
             except KeyError:
                 pass
@@ -172,7 +188,7 @@ class YamlGenerator:
         for r in RS_list:
             try:
                 obj = route_set_object_dir.data[r]
-                dic_objects[self.name_prefix + r] = self._convert_RS_to_dict(obj, route_set_object_dir)
+                dic_objects[self.name_prefix + r] = self._convert_RS_to_dict(obj, route_set_object_dir, aggregate)
             except KeyError:
                 pass
 
