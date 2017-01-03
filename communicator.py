@@ -4,12 +4,17 @@ import requests
 
 import errors
 
+import rest_cache
+
 
 class Communicator():
     ripe_db_url = "http://rest.db.ripe.net"
     default_db_source = "ripe"
     alternative_db_sources = ("RADB-GRS", "APNIC-GRS", "ARIN-GRS",
                               "LACNIC-GRS", "AFRINIC-GRS", "JPIRR-GRS")
+    policy_keyword = 'policy'
+    filterset_keyword = 'filterset'
+    route_keyword = 'route'
 
     def __init__(self, db_url=ripe_db_url, source=default_db_source,
                  alternatives=alternative_db_sources):
@@ -26,6 +31,7 @@ class Communicator():
         self.session.headers = {'Accept': 'application/xml'}
         self.flags = set()
         self.flags.add('no-referenced')
+        self.cache = rest_cache.RestCache()
 
         # (TCP keep-alive) Used when we have a not-yet-known closed session.
         # The server closes the connection, but we already have a request in
@@ -35,48 +41,67 @@ class Communicator():
 
     def get_policy_by_autnum(self, autnum):
         db_reply = None
-        try:
-            url = self._search_URL_builder(autnum, None, (), self.flags)
-            db_reply = self._send_DB_request(url)
-            logging.debug("Policy received for {}".format(autnum))
-        except errors.RIPEDBError:
-            logging.error("Failed to receive policy for "
-                          "{} due to RIPE DB error.".format(autnum))
-        except errors.SendRequestError as e:
-            logging.error('Get policy failed. {}'.format(e))
+        url = self._search_URL_builder(autnum, None, (), self.flags)
+        _cached_reply = self.cache.get_or(url, self.policy_keyword)
+        if _cached_reply != "":
+            db_reply = _cached_reply
+            logging.debug('Policy for {} found in cache'.format(autnum))
+        else:
+            try:
+                db_reply = self._send_DB_request(url)
+                logging.debug("Policy received for {}".format(autnum))
+                self.cache.update(url, db_reply, self.policy_keyword)
+            except errors.RIPEDBError:
+                logging.error("Failed to receive policy for "
+                              "{} due to RIPE DB error.".format(autnum))
+            except errors.SendRequestError as e:
+                logging.error('Get policy failed. {}'.format(e))
 
         return db_reply
 
     def get_filter_set(self, value):
         """Makes requests for as-set, route-set."""
         db_reply = None
-        try:
-            url = self._search_URL_builder(value, None, (), self.flags)
-            db_reply = self._send_DB_request(url)
-        except errors.RIPEDBError:
-            logging.error('Get Filter failed for '
-                          '{} due to RIPE DB error.'.format(value))
-        except errors.SendRequestError as e:
-            logging.error('Get all routes failed for {}. {}'.format(value, e))
+        url = self._search_URL_builder(value, None, (), self.flags)
+        _cached_reply = self.cache.get_or(url, self.filterset_keyword)
+        if _cached_reply != "":
+            db_reply = _cached_reply
+            logging.debug('Filter set {} found in cache'.format(value))
+        else:
+            try:
+                db_reply = self._send_DB_request(url)
+                self.cache.update(url, db_reply, self.filterset_keyword)
+            except errors.RIPEDBError:
+                logging.error('Get Filter failed for '
+                              '{} due to RIPE DB error.'.format(value))
+            except errors.SendRequestError as e:
+                logging.error('Get all routes failed for {}. {}'.format(value, e))
+
         return db_reply
 
     def get_routes_by_autnum(self, autnum, ipv6_enabled=False):
         """Requests all the route[6] objects for a given AS number."""
         db_reply = None
+        type_filter = ['route']
         if ipv6_enabled:
-            url = self._search_URL_builder(autnum, "origin",
-                                           ("route", "route6"), self.flags)
-        else:
-            url = self._search_URL_builder(autnum, "origin",
-                                           ("route",), self.flags)
+            type_filter.append('route6')
 
-        try:
-            db_reply = self._send_DB_request(url)
-        except errors.RIPEDBError:
-            logging.error('Get all routes failed for '
-                          '{} due to RIPE DB error'.format(autnum))
-        except errors.SendRequestError as e:
-            logging.error('Get all routes failed for {}. {}'.format(autnum, e))
+        url = self._search_URL_builder(autnum, 'origin', type_filter, self.flags)
+
+        _cached_reply = self.cache.get_or(url, self.route_keyword)
+        if _cached_reply != "":
+            db_reply = _cached_reply
+            logging.debug('Routes originated by {} found in cache'.format(autnum))
+        else:
+            try:
+                db_reply = self._send_DB_request(url)
+                self.cache.update(url, db_reply, self.route_keyword)
+            except errors.RIPEDBError:
+                logging.error('Get all routes failed for '
+                              '{} due to RIPE DB error'.format(autnum))
+            except errors.SendRequestError as e:
+                logging.error('Get all routes failed for {}. {}'.format(autnum, e))
+
         return db_reply
 
     def _search_URL_builder(self, query_string, inverse_attribute,
@@ -108,6 +133,7 @@ class Communicator():
         non-expected status code.
         """
         retries = self.max_retries
+        logging.debug('Communicator._send_DB_request {}'.format(db_url))
         while True:
             try:
                 r = self.session.get(db_url)
