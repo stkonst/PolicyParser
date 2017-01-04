@@ -3,7 +3,6 @@ import logging
 import requests
 
 import errors
-
 import rest_cache
 
 
@@ -12,9 +11,13 @@ class Communicator():
     default_db_source = "ripe"
     alternative_db_sources = ("RADB-GRS", "APNIC-GRS", "ARIN-GRS",
                               "LACNIC-GRS", "AFRINIC-GRS", "JPIRR-GRS")
+
     policy_keyword = 'policy'
     filterset_keyword = 'filterset'
     route_keyword = 'route'
+
+    CACHING_ROOT_FOLDER = "~/.libParser/cache/"
+    EXPIRE_TIMEOUT_AFTER = 86400
 
     def __init__(self, db_url=ripe_db_url, source=default_db_source,
                  alternatives=alternative_db_sources):
@@ -31,7 +34,7 @@ class Communicator():
         self.session.headers = {'Accept': 'application/xml'}
         self.flags = set()
         self.flags.add('no-referenced')
-        self.cache = rest_cache.RestCache()
+        self.cache = rest_cache.RestCache(self.EXPIRE_TIMEOUT_AFTER, self.CACHING_ROOT_FOLDER)
 
         # (TCP keep-alive) Used when we have a not-yet-known closed session.
         # The server closes the connection, but we already have a request in

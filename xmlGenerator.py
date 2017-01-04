@@ -102,24 +102,31 @@ class XmlGenerator:
         prefixes.
         """
 
-        route_list4 = []
-        route_list6 = []
-
-        for r in AS_object.route_obj_dir.origin_table.itervalues():
-            route_list4.append(r)
-
-        for r in AS_object.route_obj_dir.origin_table_v6.itervalues():
-            route_list6.append(r)
-
         if aggregate:
+            route_list4 = []
+            route_list6 = []
+
+            for r in AS_object.route_obj_dir.origin_table.itervalues():
+                route_list4.append(r.route)
+
+            for r in AS_object.route_obj_dir.origin_table_v6.itervalues():
+                route_list6.append(r.route)
+
             route_list4 = aggregator.aggregate_prefix_list(route_list4)
             route_list6 = aggregator.aggregate_prefix_list(route_list6)
 
-        for r in route_list4:
-            et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+            for r in route_list4:
+                et.SubElement(pl, 'prefix', attrib={'type': "ROUTE"}).text = r
 
-        for r in route_list6:
-            et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+            for r in route_list6:
+                et.SubElement(pl, 'prefix', attrib={'type': "ROUTE6"}).text = r
+
+        else:
+            for r in AS_object.route_obj_dir.origin_table.itervalues():
+                et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
+
+            for r in AS_object.route_obj_dir.origin_table_v6.itervalues():
+                et.SubElement(pl, 'prefix', attrib={'type': r.ROUTE_ATTR}).text = r.route
 
     def _route_set_to_XML(self, route_set_object, route_set_object_dir, pl, aggregate):
         """Traverses the tree created by the RSes. Ignores duplicate routes

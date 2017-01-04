@@ -17,13 +17,15 @@ class SingletonRestCache(type):
 
 class RestCache(object):
     __metaclass__ = SingletonRestCache
-    # Folder where to store cached entries
+    # Default folder where to store cached entries
     CACHED_ROOT_FOLDER = "~/.libParser/cache/"
+
+    # Default expiration timeout
     # How old, in seconds, cached files are to be used?
     DEFAULT_EXPIRE_AFTER = 86400
 
-    def __init__(self, timeout=DEFAULT_EXPIRE_AFTER):
-        self.cached_main_folder = os.path.expanduser(self.CACHED_ROOT_FOLDER)
+    def __init__(self, timeout=DEFAULT_EXPIRE_AFTER, caching_folder=CACHED_ROOT_FOLDER):
+        self.cached_main_folder = os.path.expanduser(caching_folder)
         self.setup_cache_folders()
         self.oldest_mtime = round(time.time() - timeout)
 
